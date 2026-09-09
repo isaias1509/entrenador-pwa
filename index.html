@@ -298,6 +298,88 @@
     </section>
   </main>
 
+  <main class="app" id="pantalla-progreso" hidden>
+    <header class="app-header">
+      <h1>Progreso corporal</h1>
+      <p class="semana-actual">Mira tendencias, no cambios de un solo día.</p>
+    </header>
+
+    <section class="resumen-progreso" id="resumen-progreso"></section>
+
+    <section class="card">
+      <div class="titulo-con-accion">
+        <div><h2>Peso</h2><p class="nota">Puedes registrarlo a diario, idealmente al despertar.</p></div>
+      </div>
+      <div class="registro-en-linea">
+        <label>Fecha<input type="date" id="fecha-peso" /></label>
+        <label>Peso (kg)<input type="number" id="peso-corporal" inputmode="decimal" min="20" max="350" step="0.1" placeholder="74.0" /></label>
+      </div>
+      <button class="btn-primario" id="btn-guardar-peso">Guardar peso</button>
+      <div class="lista-registros" id="lista-pesos"></div>
+    </section>
+
+    <section class="card">
+      <div class="titulo-con-accion">
+        <h2>Tendencia</h2>
+        <select id="grafica-metrica" class="select-compacto">
+          <option value="peso">Peso</option>
+          <option value="cintura">Cintura</option>
+          <option value="abdomen">Abdomen</option>
+        </select>
+      </div>
+      <div class="grafica-progreso" id="grafica-progreso"></div>
+    </section>
+
+    <section class="card">
+      <div class="titulo-con-accion">
+        <div><h2>Medidas</h2><p class="nota">Cintura/abdomen semanal; medidas completas cada 2–4 semanas.</p></div>
+        <button class="btn-texto" id="btn-mostrar-medidas">Registrar</button>
+      </div>
+      <form id="form-medidas" hidden>
+        <div class="grid-campos medidas-grid">
+          <label>Fecha<input type="date" id="fecha-medidas" /></label>
+          <label>Cuello (cm)<input type="number" id="medida-cuello" step="0.1" inputmode="decimal" /></label>
+          <label>Pecho (cm)<input type="number" id="medida-pecho" step="0.1" inputmode="decimal" /></label>
+          <label>Cintura (cm)<input type="number" id="medida-cintura" step="0.1" inputmode="decimal" /></label>
+          <label>Abdomen (cm)<input type="number" id="medida-abdomen" step="0.1" inputmode="decimal" /></label>
+          <label>Cadera (cm)<input type="number" id="medida-cadera" step="0.1" inputmode="decimal" /></label>
+          <label>Hombros (cm)<input type="number" id="medida-hombros" step="0.1" inputmode="decimal" /></label>
+          <label>Brazo der. (cm)<input type="number" id="medida-brazoDer" step="0.1" inputmode="decimal" /></label>
+          <label>Brazo izq. (cm)<input type="number" id="medida-brazoIzq" step="0.1" inputmode="decimal" /></label>
+          <label>Antebrazo der. (cm)<input type="number" id="medida-antebrazoDer" step="0.1" inputmode="decimal" /></label>
+          <label>Antebrazo izq. (cm)<input type="number" id="medida-antebrazoIzq" step="0.1" inputmode="decimal" /></label>
+          <label>Muslo der. (cm)<input type="number" id="medida-musloDer" step="0.1" inputmode="decimal" /></label>
+          <label>Muslo izq. (cm)<input type="number" id="medida-musloIzq" step="0.1" inputmode="decimal" /></label>
+          <label>Pantorrilla der. (cm)<input type="number" id="medida-pantorrillaDer" step="0.1" inputmode="decimal" /></label>
+          <label>Pantorrilla izq. (cm)<input type="number" id="medida-pantorrillaIzq" step="0.1" inputmode="decimal" /></label>
+        </div>
+        <p class="nota formulario-nota">No necesitas llenar todo: guarda solo lo que mediste hoy.</p>
+        <button type="submit" class="btn-primario">Guardar medidas</button>
+        <button type="button" class="btn-secundario btn-ancho" id="btn-cancelar-medidas">Cancelar</button>
+      </form>
+      <div class="lista-registros" id="lista-medidas"></div>
+    </section>
+
+    <section class="card">
+      <div class="titulo-con-accion">
+        <div><h2>Fotos de progreso</h2><p class="nota">Cada 4 semanas, con la misma luz, distancia y postura.</p></div>
+        <span class="estado-foto" id="estado-proxima-foto"></span>
+      </div>
+      <form id="form-fotos" class="form-fotos">
+        <label>Fecha<input type="date" id="fecha-fotos" /></label>
+        <div class="inputs-foto">
+          <label>Frente<input type="file" id="foto-frente" accept="image/*" /></label>
+          <label>Perfil<input type="file" id="foto-perfil" accept="image/*" /></label>
+          <label>Espalda<input type="file" id="foto-espalda" accept="image/*" /></label>
+        </div>
+        <label>Condiciones / nota<textarea id="nota-fotos" placeholder="En ayunas, misma habitación, luz frontal..."></textarea></label>
+        <button type="submit" class="btn-primario" id="btn-guardar-fotos">Guardar fotos</button>
+        <p class="nota">Se reducen antes de guardarse. Elige al menos una; puedes completar las demás después.</p>
+      </form>
+      <div id="galeria-progreso" class="galeria-progreso"></div>
+    </section>
+  </main>
+
   <main class="app" id="pantalla-historial" hidden>
     <header class="app-header header-entrenamiento">
       <button class="btn-texto" id="btn-cerrar-historial">← Volver</button>

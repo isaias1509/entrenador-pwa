@@ -1659,6 +1659,278 @@ function guardarObjetivosNutricion() {
   renderizarNutricion();
 }
 
+// ============================================================
+// PROGRESO CORPORAL
+// ============================================================
+
+const CAMPOS_MEDIDAS = ["cuello", "pecho", "cintura", "abdomen", "cadera", "hombros", "brazoDer", "brazoIzq", "antebrazoDer", "antebrazoIzq", "musloDer", "musloIzq", "pantorrillaDer", "pantorrillaIzq"];
+let urlsFotosActivas = [];
+
+function obtenerProgresoCorporal() {
+  try {
+    const datos = JSON.parse(localStorage.getItem("progresoCorporal"));
+    return datos && Array.isArray(datos.pesos) && Array.isArray(datos.medidas) ? datos : { pesos: [], medidas: [] };
+  } catch (error) {
+    return { pesos: [], medidas: [] };
+  }
+}
+
+function guardarProgresoCorporal(datos) {
+  localStorage.setItem("progresoCorporal", JSON.stringify(datos));
+}
+
+function inicializarProgresoCorporal() {
+  if (localStorage.getItem("progresoCorporal") !== null) return;
+  guardarProgresoCorporal({
+    pesos: [{ fecha: "2026-08-27", peso: 74 }],
+    medidas: [{ fecha: "2026-08-27", cuello: 39.5, pecho: 97, cintura: 88, abdomen: 91.5, cadera: 92, hombros: 43, brazoDer: 29, brazoIzq: 28.5, antebrazoDer: 26.5, antebrazoIzq: 26.1, musloDer: 58.5, musloIzq: 58.5, pantorrillaDer: 36.5, pantorrillaIzq: 34.8 }]
+  });
+}
+
+function fechaLegibleCorta(fecha) {
+  return new Date(`${fecha}T12:00:00`).toLocaleDateString("es-PE", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function promedioSemanalPeso(pesos, referencia = claveFechaLocal()) {
+  const { inicio, fin } = inicioYFinDeSemana(referencia);
+  const desde = claveFechaLocal(inicio);
+  const hasta = claveFechaLocal(fin);
+  const registros = pesos.filter((item) => item.fecha >= desde && item.fecha <= hasta);
+  return registros.length ? registros.reduce((total, item) => total + item.peso, 0) / registros.length : null;
+}
+
+function guardarPesoCorporal() {
+  const fecha = document.getElementById("fecha-peso").value;
+  const peso = Number(document.getElementById("peso-corporal").value);
+  if (!fecha || !Number.isFinite(peso) || peso < 20 || peso > 350) return alert("Ingresa una fecha y un peso válido.");
+  const datos = obtenerProgresoCorporal();
+  const existente = datos.pesos.findIndex((item) => item.fecha === fecha);
+  if (existente >= 0) datos.pesos[existente] = { fecha, peso };
+  else datos.pesos.push({ fecha, peso });
+  guardarProgresoCorporal(datos);
+  document.getElementById("peso-corporal").value = "";
+  renderizarProgreso();
+}
+
+function eliminarPeso(fecha) {
+  if (!confirm(`¿Eliminar el peso del ${fechaLegibleCorta(fecha)}?`)) return;
+  const datos = obtenerProgresoCorporal();
+  datos.pesos = datos.pesos.filter((item) => item.fecha !== fecha);
+  guardarProgresoCorporal(datos);
+  renderizarProgreso();
+}
+
+function guardarMedidas(evento) {
+  evento.preventDefault();
+  const fecha = document.getElementById("fecha-medidas").value;
+  if (!fecha) return alert("Selecciona la fecha de las medidas.");
+  const registro = { fecha };
+  CAMPOS_MEDIDAS.forEach((campo) => {
+    const valor = Number(document.getElementById(`medida-${campo}`).value);
+    if (valor > 0) registro[campo] = valor;
+  });
+  if (Object.keys(registro).length === 1) return alert("Ingresa al menos una medida.");
+  const datos = obtenerProgresoCorporal();
+  const indice = datos.medidas.findIndex((item) => item.fecha === fecha);
+  if (indice >= 0) datos.medidas[indice] = { ...datos.medidas[indice], ...registro };
+  else datos.medidas.push(registro);
+  guardarProgresoCorporal(datos);
+  cerrarFormularioMedidas();
+  renderizarProgreso();
+}
+
+function abrirFormularioMedidas(fecha = claveFechaLocal()) {
+  const form = document.getElementById("form-medidas");
+  form.hidden = false;
+  document.getElementById("fecha-medidas").value = fecha;
+  const registro = obtenerProgresoCorporal().medidas.find((item) => item.fecha === fecha) || {};
+  CAMPOS_MEDIDAS.forEach((campo) => document.getElementById(`medida-${campo}`).value = registro[campo] || "");
+  form.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function cerrarFormularioMedidas() {
+  document.getElementById("form-medidas").hidden = true;
+  CAMPOS_MEDIDAS.forEach((campo) => document.getElementById(`medida-${campo}`).value = "");
+}
+
+function eliminarMedidas(fecha) {
+  if (!confirm(`¿Eliminar las medidas del ${fechaLegibleCorta(fecha)}?`)) return;
+  const datos = obtenerProgresoCorporal();
+  datos.medidas = datos.medidas.filter((item) => item.fecha !== fecha);
+  guardarProgresoCorporal(datos);
+  renderizarProgreso();
+}
+
+function renderizarResumenProgreso(datos) {
+  const pesos = [...datos.pesos].sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const medidas = [...datos.medidas].sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const ultimoPeso = pesos.at(-1);
+  const ultimaMedida = medidas.at(-1);
+  const promedioActual = promedioSemanalPeso(pesos);
+  const haceSieteDias = new Date();
+  haceSieteDias.setDate(haceSieteDias.getDate() - 7);
+  const promedioAnterior = promedioSemanalPeso(pesos, claveFechaLocal(haceSieteDias));
+  let cambio = "Sin comparación anterior";
+  if (promedioActual !== null && promedioAnterior !== null) {
+    const diferencia = redondear(promedioActual - promedioAnterior);
+    cambio = `${diferencia > 0 ? "+" : ""}${diferencia} kg vs. semana anterior`;
+  }
+  document.getElementById("resumen-progreso").innerHTML = `
+    <div><strong>${ultimoPeso ? `${redondear(ultimoPeso.peso)} kg` : "—"}</strong><span>Peso actual</span></div>
+    <div><strong>${promedioActual !== null ? `${redondear(promedioActual)} kg` : "—"}</strong><span>Promedio semanal</span><small>${cambio}</small></div>
+    <div><strong>${ultimaMedida?.cintura ? `${redondear(ultimaMedida.cintura)} cm` : "—"}</strong><span>Cintura</span></div>
+    <div><strong>${ultimaMedida?.abdomen ? `${redondear(ultimaMedida.abdomen)} cm` : "—"}</strong><span>Abdomen</span></div>`;
+}
+
+function renderizarListasProgreso(datos) {
+  const pesos = [...datos.pesos].sort((a, b) => b.fecha.localeCompare(a.fecha));
+  document.getElementById("lista-pesos").innerHTML = pesos.length ? pesos.slice(0, 10).map((item) => `<div class="registro-progreso"><div><strong>${redondear(item.peso)} kg</strong><span>${fechaLegibleCorta(item.fecha)}</span></div><div><button class="btn-serie-accion" data-editar-peso="${item.fecha}">Editar</button><button class="btn-serie-accion btn-serie-eliminar" data-eliminar-peso="${item.fecha}">Eliminar</button></div></div>`).join("") : '<p class="frecuente-vacio">Aún no hay pesos registrados.</p>';
+
+  const etiquetas = { cuello: "Cuello", pecho: "Pecho", cintura: "Cintura", abdomen: "Abdomen", cadera: "Cadera", hombros: "Hombros", brazoDer: "Brazo D", brazoIzq: "Brazo I", antebrazoDer: "Antebrazo D", antebrazoIzq: "Antebrazo I", musloDer: "Muslo D", musloIzq: "Muslo I", pantorrillaDer: "Pantorrilla D", pantorrillaIzq: "Pantorrilla I" };
+  const medidas = [...datos.medidas].sort((a, b) => b.fecha.localeCompare(a.fecha));
+  document.getElementById("lista-medidas").innerHTML = medidas.length ? medidas.slice(0, 8).map((item) => {
+    const resumen = CAMPOS_MEDIDAS.filter((campo) => item[campo]).map((campo) => `${etiquetas[campo]} ${redondear(item[campo])}`).join(" · ");
+    return `<div class="registro-progreso registro-medidas"><div><strong>${fechaLegibleCorta(item.fecha)}</strong><span>${resumen} cm</span></div><div><button class="btn-serie-accion" data-editar-medidas="${item.fecha}">Editar</button><button class="btn-serie-accion btn-serie-eliminar" data-eliminar-medidas="${item.fecha}">Eliminar</button></div></div>`;
+  }).join("") : '<p class="frecuente-vacio">Aún no hay medidas registradas.</p>';
+}
+
+function renderizarGraficaProgreso(datos) {
+  const metrica = document.getElementById("grafica-metrica").value;
+  const origen = metrica === "peso" ? datos.pesos.map((item) => ({ fecha: item.fecha, valor: item.peso })) : datos.medidas.filter((item) => item[metrica]).map((item) => ({ fecha: item.fecha, valor: item[metrica] }));
+  const puntos = origen.sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(-12);
+  const contenedor = document.getElementById("grafica-progreso");
+  if (!puntos.length) {
+    contenedor.innerHTML = '<p class="frecuente-vacio">Registra datos para ver la tendencia.</p>';
+    return;
+  }
+  const valores = puntos.map((p) => p.valor);
+  let minimo = Math.min(...valores), maximo = Math.max(...valores);
+  if (minimo === maximo) { minimo -= 1; maximo += 1; }
+  const x = (i) => puntos.length === 1 ? 150 : 18 + i * 264 / (puntos.length - 1);
+  const y = (v) => 116 - (v - minimo) / (maximo - minimo) * 88;
+  const linea = puntos.map((p, i) => `${x(i)},${y(p.valor)}`).join(" ");
+  const unidad = metrica === "peso" ? "kg" : "cm";
+  contenedor.innerHTML = `<svg viewBox="0 0 300 150" role="img" aria-label="Tendencia de ${metrica}">
+    <line x1="18" y1="28" x2="18" y2="116" class="eje-grafica"/><line x1="18" y1="116" x2="282" y2="116" class="eje-grafica"/>
+    <polyline points="${linea}" class="linea-grafica"/>
+    ${puntos.map((p, i) => `<circle cx="${x(i)}" cy="${y(p.valor)}" r="4" class="punto-grafica"><title>${p.fecha}: ${redondear(p.valor)} ${unidad}</title></circle>`).join("")}
+    <text x="20" y="20" class="texto-grafica">${redondear(maximo)} ${unidad}</text><text x="20" y="137" class="texto-grafica">${fechaLegibleCorta(puntos[0].fecha)}</text><text x="280" y="137" text-anchor="end" class="texto-grafica">${fechaLegibleCorta(puntos.at(-1).fecha)}</text>
+  </svg>`;
+}
+
+function abrirBaseFotos() {
+  return new Promise((resolve, reject) => {
+    const solicitud = indexedDB.open("miGymProgreso", 1);
+    solicitud.onupgradeneeded = () => solicitud.result.createObjectStore("fotos", { keyPath: "fecha" });
+    solicitud.onsuccess = () => resolve(solicitud.result);
+    solicitud.onerror = () => reject(solicitud.error);
+  });
+}
+
+async function consultarFotos() {
+  const db = await abrirBaseFotos();
+  return new Promise((resolve, reject) => {
+    const solicitud = db.transaction("fotos", "readonly").objectStore("fotos").getAll();
+    solicitud.onsuccess = () => { db.close(); resolve(solicitud.result.sort((a, b) => b.fecha.localeCompare(a.fecha))); };
+    solicitud.onerror = () => { db.close(); reject(solicitud.error); };
+  });
+}
+
+async function reducirImagen(archivo) {
+  const url = URL.createObjectURL(archivo);
+  try {
+    const imagen = new Image();
+    await new Promise((resolve, reject) => { imagen.onload = resolve; imagen.onerror = reject; imagen.src = url; });
+    const escala = Math.min(1, 1600 / Math.max(imagen.naturalWidth, imagen.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(imagen.naturalWidth * escala);
+    canvas.height = Math.round(imagen.naturalHeight * escala);
+    canvas.getContext("2d").drawImage(imagen, 0, 0, canvas.width, canvas.height);
+    return await new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.8));
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function guardarFotosProgreso(evento) {
+  evento.preventDefault();
+  const fecha = document.getElementById("fecha-fotos").value;
+  const archivos = { frente: document.getElementById("foto-frente").files[0], perfil: document.getElementById("foto-perfil").files[0], espalda: document.getElementById("foto-espalda").files[0] };
+  if (!fecha || !Object.values(archivos).some(Boolean)) return alert("Selecciona una fecha y al menos una foto.");
+  const boton = document.getElementById("btn-guardar-fotos");
+  boton.disabled = true; boton.textContent = "Guardando…";
+  try {
+    const db = await abrirBaseFotos();
+    const anterior = await new Promise((resolve) => { const s = db.transaction("fotos").objectStore("fotos").get(fecha); s.onsuccess = () => resolve(s.result || { fecha, fotos: {} }); });
+    const fotos = { ...(anterior.fotos || {}) };
+    for (const [lado, archivo] of Object.entries(archivos)) if (archivo) fotos[lado] = await reducirImagen(archivo);
+    const registro = { fecha, nota: document.getElementById("nota-fotos").value.trim(), fotos };
+    await new Promise((resolve, reject) => { const s = db.transaction("fotos", "readwrite").objectStore("fotos").put(registro); s.onsuccess = resolve; s.onerror = () => reject(s.error); });
+    db.close();
+    document.getElementById("form-fotos").reset();
+    document.getElementById("fecha-fotos").value = claveFechaLocal();
+    await renderizarGaleriaFotos();
+  } catch (error) {
+    console.error(error); alert("No se pudieron guardar las fotos. Revisa el espacio disponible e inténtalo otra vez.");
+  } finally {
+    boton.disabled = false; boton.textContent = "Guardar fotos";
+  }
+}
+
+async function eliminarFotosProgreso(fecha) {
+  if (!confirm(`¿Eliminar las fotos del ${fechaLegibleCorta(fecha)}? Esta acción no se puede deshacer.`)) return;
+  const db = await abrirBaseFotos();
+  await new Promise((resolve, reject) => { const s = db.transaction("fotos", "readwrite").objectStore("fotos").delete(fecha); s.onsuccess = resolve; s.onerror = () => reject(s.error); });
+  db.close();
+  await renderizarGaleriaFotos();
+}
+
+async function renderizarGaleriaFotos() {
+  urlsFotosActivas.forEach(URL.revokeObjectURL); urlsFotosActivas = [];
+  const contenedor = document.getElementById("galeria-progreso");
+  try {
+    const registros = await consultarFotos();
+    const estado = document.getElementById("estado-proxima-foto");
+    if (!registros.length) estado.textContent = "Primera sesión pendiente";
+    else {
+      const proxima = new Date(`${registros[0].fecha}T12:00:00`); proxima.setDate(proxima.getDate() + 28);
+      const dias = Math.ceil((proxima - new Date()) / 86400000);
+      estado.textContent = dias > 0 ? `Próxima en ${dias} días` : "Ya corresponde";
+    }
+    if (!registros.length) { contenedor.innerHTML = '<p class="frecuente-vacio">Aún no tienes sesiones de fotos.</p>'; return; }
+    contenedor.innerHTML = registros.map((registro) => {
+      const fotos = ["frente", "perfil", "espalda"].filter((lado) => registro.fotos?.[lado]).map((lado) => {
+        const url = URL.createObjectURL(registro.fotos[lado]); urlsFotosActivas.push(url);
+        return `<figure><img src="${url}" alt="Foto de ${lado}, ${registro.fecha}" loading="lazy"><figcaption>${lado}</figcaption></figure>`;
+      }).join("");
+      return `<article class="sesion-fotos"><div class="sesion-fotos-cabecera"><div><strong>${fechaLegibleCorta(registro.fecha)}</strong>${registro.nota ? `<p>${escaparHTML(registro.nota)}</p>` : ""}</div><button class="btn-serie-accion btn-serie-eliminar" data-eliminar-fotos="${registro.fecha}">Eliminar</button></div><div class="fotos-grid">${fotos}</div></article>`;
+    }).join("");
+  } catch (error) {
+    console.error(error); contenedor.innerHTML = '<p class="frecuente-vacio">No se pudo abrir el almacenamiento de fotos.</p>';
+  }
+}
+
+function renderizarProgreso() {
+  const datos = obtenerProgresoCorporal();
+  renderizarResumenProgreso(datos);
+  renderizarListasProgreso(datos);
+  renderizarGraficaProgreso(datos);
+  renderizarGaleriaFotos();
+}
+
+function mostrarProgreso() {
+  if (temporizadorBoxeo) pausarOReanudarBoxeo();
+  if (temporizadorDescanso) detenerDescanso(false);
+  if (sesion) guardarSesionActiva();
+  document.querySelectorAll("main.app").forEach((pantalla) => pantalla.hidden = true);
+  document.getElementById("pantalla-progreso").hidden = false;
+  document.querySelectorAll(".nav-item").forEach((boton) => boton.classList.remove("active"));
+  document.getElementById("nav-progreso").classList.add("active");
+  document.getElementById("fecha-peso").value ||= claveFechaLocal();
+  document.getElementById("fecha-fotos").value ||= claveFechaLocal();
+  renderizarProgreso();
+}
+
 function mostrarHoy() {
   if (temporizadorBoxeo) pausarOReanudarBoxeo();
   document.querySelectorAll("main.app").forEach((pantalla) => pantalla.hidden = true);
@@ -1759,7 +2031,29 @@ function inicializarEventosEntrenamiento() {
   document.getElementById("btn-volver-lista-historial").addEventListener("click", volverAListaHistorial);
   document.getElementById("btn-eliminar-entrenamiento").addEventListener("click", eliminarEntrenamientoGuardado);
   document.getElementById("nav-nutricion").addEventListener("click", mostrarNutricion);
-  document.getElementById("nav-progreso").addEventListener("click", () => alert("Progreso llegará en la Etapa 3."));
+  document.getElementById("nav-progreso").addEventListener("click", mostrarProgreso);
+  document.getElementById("btn-guardar-peso").addEventListener("click", guardarPesoCorporal);
+  document.getElementById("grafica-metrica").addEventListener("change", () => renderizarGraficaProgreso(obtenerProgresoCorporal()));
+  document.getElementById("btn-mostrar-medidas").addEventListener("click", () => abrirFormularioMedidas());
+  document.getElementById("btn-cancelar-medidas").addEventListener("click", cerrarFormularioMedidas);
+  document.getElementById("form-medidas").addEventListener("submit", guardarMedidas);
+  document.getElementById("form-fotos").addEventListener("submit", guardarFotosProgreso);
+  document.getElementById("lista-pesos").addEventListener("click", (evento) => {
+    const editar = evento.target.closest("[data-editar-peso]");
+    const eliminar = evento.target.closest("[data-eliminar-peso]");
+    if (editar) { const fecha = editar.dataset.editarPeso; const item = obtenerProgresoCorporal().pesos.find((peso) => peso.fecha === fecha); document.getElementById("fecha-peso").value = fecha; document.getElementById("peso-corporal").value = item?.peso || ""; document.getElementById("peso-corporal").focus(); }
+    if (eliminar) eliminarPeso(eliminar.dataset.eliminarPeso);
+  });
+  document.getElementById("lista-medidas").addEventListener("click", (evento) => {
+    const editar = evento.target.closest("[data-editar-medidas]");
+    const eliminar = evento.target.closest("[data-eliminar-medidas]");
+    if (editar) abrirFormularioMedidas(editar.dataset.editarMedidas);
+    if (eliminar) eliminarMedidas(eliminar.dataset.eliminarMedidas);
+  });
+  document.getElementById("galeria-progreso").addEventListener("click", (evento) => {
+    const eliminar = evento.target.closest("[data-eliminar-fotos]");
+    if (eliminar) eliminarFotosProgreso(eliminar.dataset.eliminarFotos);
+  });
   document.getElementById("fecha-nutricion").addEventListener("change", () => {
     cerrarFormularioComida();
     renderizarNutricion();
@@ -1818,5 +2112,6 @@ if ("serviceWorker" in navigator) {
 }
 
 // ---------- Arranque ----------
+inicializarProgresoCorporal();
 inicializarConfiguracion();
 inicializarEventosEntrenamiento();

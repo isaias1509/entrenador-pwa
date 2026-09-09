@@ -512,3 +512,92 @@ body {
 .btn-frecuente-add { color: #86efac; }
 .check-frecuente { display: flex; align-items: center; gap: 8px; color: #bfc0c8; font-size: 0.82rem; margin-top: 12px; }
 .check-frecuente input { width: 18px; height: 18px; accent-color: #a68cff; }
+
+/* Etapa 3: progreso corporal */
+.resumen-progreso {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 9px;
+  margin-top: 20px;
+}
+.resumen-progreso > div {
+  background: #16161d;
+  border-radius: 13px;
+  padding: 14px;
+  min-width: 0;
+}
+.resumen-progreso strong { display: block; color: #a68cff; font-size: 1.18rem; }
+.resumen-progreso span { display: block; color: #8a8a92; font-size: .72rem; margin-top: 3px; }
+.resumen-progreso small { display: block; color: #64748b; font-size: .65rem; margin-top: 5px; }
+
+.registro-en-linea { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.registro-en-linea label,
+.form-fotos > label,
+.inputs-foto label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #8a8a92;
+  font-size: .78rem;
+}
+.registro-en-linea input,
+.form-fotos input,
+.form-fotos textarea,
+.select-compacto {
+  width: 100%;
+  background: #1c1c24;
+  color: #fff;
+  border: 1px solid #30303a;
+  border-radius: 9px;
+  padding: 10px;
+  font-size: .9rem;
+}
+.select-compacto { width: auto; max-width: 125px; }
+.lista-registros { margin-top: 13px; }
+.registro-progreso {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid #292932;
+}
+.registro-progreso > div:first-child { min-width: 0; }
+.registro-progreso strong { display: block; font-size: .9rem; }
+.registro-progreso span { display: block; color: #85858f; font-size: .72rem; margin-top: 3px; overflow-wrap: anywhere; }
+.registro-medidas span { line-height: 1.45; }
+.formulario-nota { margin-top: 10px; }
+
+.grafica-progreso { min-height: 155px; margin-top: 10px; }
+.grafica-progreso svg { display: block; width: 100%; height: auto; overflow: visible; }
+.eje-grafica { stroke: #353542; stroke-width: 1; }
+.linea-grafica { fill: none; stroke: #8b5cf6; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.punto-grafica { fill: #60a5fa; stroke: #101014; stroke-width: 2; }
+.texto-grafica { fill: #8a8a92; font-size: 8px; }
+
+.estado-foto {
+  color: #93c5fd;
+  background: #172840;
+  border-radius: 999px;
+  padding: 6px 9px;
+  font-size: .68rem;
+  white-space: nowrap;
+}
+.form-fotos { margin-top: 14px; }
+.inputs-foto { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; }
+.inputs-foto input { padding: 8px 5px; font-size: .7rem; }
+.form-fotos textarea { min-height: 60px; resize: vertical; }
+.galeria-progreso { margin-top: 14px; }
+.sesion-fotos { border-top: 1px solid #292932; padding: 14px 0; }
+.sesion-fotos-cabecera { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
+.sesion-fotos-cabecera p { color: #85858f !important; font-size: .72rem; margin-top: 4px; }
+.fotos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.fotos-grid figure { min-width: 0; }
+.fotos-grid img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 9px; background: #0d0d12; }
+.fotos-grid figcaption { color: #8a8a92; font-size: .68rem; text-align: center; text-transform: capitalize; margin-top: 4px; }
+
+@media (max-width: 380px) {
+  .registro-en-linea { grid-template-columns: 1fr; }
+  .inputs-foto { grid-template-columns: 1fr; }
+  .inputs-foto input { font-size: .8rem; }
+}
