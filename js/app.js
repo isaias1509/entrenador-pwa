@@ -232,6 +232,7 @@ function renderizarBoxeoOpcional(rutina, semanaActual, diaSemana) {
 
 let sesion = null;
 let indiceEdicionSerie = null;
+let indiceHistorialAbierto = null;
 let temporizadorDescanso = null;
 let finDescansoMs = null;
 let segundosRestantes = 0;
@@ -993,7 +994,8 @@ function completarFaseCardio() {
   if (minutos <= 0 || velocidad < 0 || inclinacion < 0) return alert("Completa correctamente los datos de esta fase.");
   sesion.cardio.registros.push({
     nombre: sesion.rutina.cardio.fases[sesion.cardio.indiceFase].nombre,
-    minutos, velocidad, inclinacion
+    minutos, velocidad, inclinacion,
+    unidad: localStorage.getItem("unidadVelocidad") || "km/h"
   });
   sesion.cardio.indiceFase++;
   guardarSesionActiva();
@@ -1140,29 +1142,153 @@ function abrirHistorial() {
   renderizarHistorial();
 }
 
+function escaparHTML(valor) {
+  return String(valor ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function duracionSesion(item) {
+  return Math.max(1, Math.round((new Date(item.fin) - new Date(item.inicio)) / 60000));
+}
+
 function renderizarHistorial() {
   const contenedor = document.getElementById("lista-historial");
-  const historial = obtenerHistorial().slice().reverse();
+  const historialCompleto = obtenerHistorial();
+  const filtroMes = document.getElementById("filtro-mes-historial").value;
+  const historial = historialCompleto
+    .map((item, indiceOriginal) => ({ item, indiceOriginal }))
+    .filter(({ item }) => !filtroMes || String(item.fecha || item.inicio).startsWith(filtroMes))
+    .reverse();
+
+  document.getElementById("contador-historial").textContent = `${historial.length} entrenamiento${historial.length === 1 ? "" : "s"}`;
   if (historial.length === 0) {
-    contenedor.innerHTML = '<p class="historial-vacio">Todavía no tienes entrenamientos guardados.</p>';
+    contenedor.innerHTML = `<p class="historial-vacio">${historialCompleto.length ? "No hay entrenamientos en este mes." : "Todavía no tienes entrenamientos guardados."}</p>`;
     return;
   }
 
-  contenedor.innerHTML = historial.map((item) => {
+  contenedor.innerHTML = historial.map(({ item, indiceOriginal }) => {
     const fecha = new Date(item.inicio).toLocaleDateString("es-PE", { day: "numeric", month: "long", year: "numeric" });
-    const minutos = Math.max(1, Math.round((new Date(item.fin) - new Date(item.inicio)) / 60000));
+    const resumen = item.resumen || calcularResumen(item);
     const detalle = item.rutina.tipo === "boxeo"
-      ? `${item.resumen.fasesBoxeo || 0} fases · ${item.resumen.roundsBoxeo || 0} rounds`
-      : `${item.resumen.ejercicios} ejercicios · ${item.resumen.series} series · ${item.resumen.reps} reps`;
-    const volumen = item.rutina.tipo === "boxeo" ? "" : `<p class="historial-datos">Volumen aproximado: ${item.resumen.volumen.toLocaleString("es-PE")} kg${item.resumen.minutosCardio ? ` · Caminadora: ${item.resumen.minutosCardio} min` : ""}</p>`;
+      ? `${resumen.fasesBoxeo || 0} fases · ${resumen.roundsBoxeo || 0} rounds`
+      : `${resumen.ejercicios || 0} ejercicios · ${resumen.series || 0} series · ${resumen.reps || 0} reps`;
+    const volumen = item.rutina.tipo === "boxeo" ? "" : `<p class="historial-datos">Volumen aproximado: ${(resumen.volumen || 0).toLocaleString("es-PE")} kg${resumen.minutosCardio ? ` · Caminadora: ${resumen.minutosCardio} min` : ""}</p>`;
     return `<article class="card historial-card">
-      <h2>${item.rutina.nombre}</h2>
-      <p class="historial-fecha">${fecha} · ${minutos} min</p>
+      <h2>${escaparHTML(item.rutina.nombre)}</h2>
+      <p class="historial-fecha">${fecha} · ${duracionSesion(item)} min</p>
       <p class="historial-datos">${detalle}</p>
       ${volumen}
-      ${item.sensaciones ? `<p class="historial-comentario">“${item.sensaciones}”</p>` : ""}
+      ${item.sensaciones ? `<p class="historial-comentario">“${escaparHTML(item.sensaciones)}”</p>` : ""}
+      <button class="btn-secundario btn-ver-detalle" data-indice-historial="${indiceOriginal}">Ver entrenamiento completo</button>
     </article>`;
   }).join("");
+}
+
+function abrirDetalleHistorial(indice) {
+  const historial = obtenerHistorial();
+  const item = historial[indice];
+  if (!item) return;
+  indiceHistorialAbierto = indice;
+  document.getElementById("pantalla-historial").hidden = true;
+  document.getElementById("pantalla-detalle-historial").hidden = false;
+  renderizarDetalleHistorial(item, indice, historial);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function encontrarSesionAnteriorEnHistorial(historial, indice, nombreRutina) {
+  for (let i = indice - 1; i >= 0; i--) {
+    if (historial[i].rutina.nombre === nombreRutina) return historial[i];
+  }
+  return null;
+}
+
+function renderizarDetalleHistorial(item, indice, historial) {
+  const contenedor = document.getElementById("detalle-historial-contenido");
+  const fecha = new Date(item.inicio).toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const resumen = item.resumen || calcularResumen(item);
+  const anterior = encontrarSesionAnteriorEnHistorial(historial, indice, item.rutina.nombre);
+  let contenido = `<section class="card detalle-cabecera">
+    <h2>${escaparHTML(item.rutina.nombre)}</h2>
+    <p class="historial-fecha">${fecha} · ${duracionSesion(item)} min</p>
+    <p class="detalle-resumen">${item.rutina.tipo === "boxeo"
+      ? `${resumen.fasesBoxeo || 0} fases · ${resumen.roundsBoxeo || 0} rounds`
+      : `${resumen.ejercicios || 0} ejercicios · ${resumen.series || 0} series · ${resumen.reps || 0} reps · ${(resumen.volumen || 0).toLocaleString("es-PE")} kg de volumen`}</p>
+    ${item.sensaciones ? `<p class="historial-comentario">“${escaparHTML(item.sensaciones)}”</p>` : ""}
+    ${crearComparacionDetalle(item, anterior)}
+  </section>`;
+
+  if (item.rutina.tipo === "boxeo") contenido += crearDetalleBoxeo(item);
+  else contenido += crearDetallePesas(item) + crearDetalleCardio(item);
+  contenedor.innerHTML = contenido;
+}
+
+function crearComparacionDetalle(item, anterior) {
+  if (!anterior) return '<div class="comparacion-detalle"><p>Primera sesión guardada de esta rutina.</p></div>';
+  if (item.rutina.tipo === "boxeo") {
+    const diferencia = (item.resumen?.roundsBoxeo || 0) - (anterior.resumen?.roundsBoxeo || 0);
+    return `<div class="comparacion-detalle"><p>Comparación anterior: ${diferencia === 0 ? "mismos rounds completados" : `${diferencia > 0 ? "+" : ""}${diferencia} rounds`}.</p></div>`;
+  }
+  const volumenActual = item.resumen?.volumen || 0;
+  const volumenAnterior = anterior.resumen?.volumen || 0;
+  const diferenciaVolumen = Math.round((volumenActual - volumenAnterior) * 10) / 10;
+  const diferenciaReps = (item.resumen?.reps || 0) - (anterior.resumen?.reps || 0);
+  return `<div class="comparacion-detalle">
+    <p>Frente a la sesión anterior: ${diferenciaVolumen >= 0 ? "+" : ""}${diferenciaVolumen.toLocaleString("es-PE")} kg de volumen · ${diferenciaReps >= 0 ? "+" : ""}${diferenciaReps} reps.</p>
+  </div>`;
+}
+
+function crearDetallePesas(item) {
+  const ejercicios = (item.rutina.ejercicios || []).map((ej) => {
+    const registro = item.registros?.[ej.id];
+    const series = registro?.series || [];
+    if (!series.length && !registro?.omitido) return "";
+    const filas = registro?.omitido
+      ? '<p class="detalle-serie">Ejercicio omitido</p>'
+      : series.map((serie) => {
+          const lado = serie.lado ? ` · ${serie.lado === "derecha" ? "Derecho" : "Izquierdo"}` : "";
+          const dato = serie.segundos ? `${serie.segundos} segundos` : `${serie.peso} kg × ${serie.reps} reps${serie.rir ? ` · RIR/dificultad: ${escaparHTML(serie.rir)}` : ""}`;
+          return `<p class="detalle-serie">Serie ${serie.numeroSerie}${lado}: ${dato}</p>`;
+        }).join("");
+    return `<div class="detalle-ejercicio"><h3>${escaparHTML(ej.nombre)}</h3>${filas}${registro?.observaciones ? `<p class="detalle-observacion">Nota: ${escaparHTML(registro.observaciones)}</p>` : ""}</div>`;
+  }).join("");
+  return `<section class="card"><h2>Pesas</h2>${ejercicios || '<p class="nota">Sin series registradas.</p>'}</section>`;
+}
+
+function crearDetalleCardio(item) {
+  const registros = item.cardio?.registros || [];
+  if (!registros.length && !item.cardioOmitido) return "";
+  const filas = item.cardioOmitido
+    ? '<p class="detalle-serie">Caminadora omitida</p>'
+    : registros.map((fase) => `<p class="detalle-serie">${escaparHTML(fase.nombre)}: ${fase.minutos} min · velocidad ${fase.velocidad} ${escaparHTML(fase.unidad || "")} · inclinación ${fase.inclinacion}</p>`).join("");
+  return `<section class="card"><h2>Caminadora</h2>${filas}</section>`;
+}
+
+function crearDetalleBoxeo(item) {
+  const segmentos = item.boxeo?.completados || [];
+  const filas = segmentos.map((segmento) => `<p class="detalle-serie">${escaparHTML(segmento.fase)}${segmento.round ? ` · Round ${segmento.round}` : ""}: ${segmento.tipo === "omitido" ? "omitido" : segmento.tipo === "descanso" ? "descanso completado" : "completado"}</p>`).join("");
+  return `<section class="card"><h2>Fases y rounds</h2>${filas || '<p class="nota">Sin segmentos registrados.</p>'}</section>`;
+}
+
+function volverAListaHistorial() {
+  indiceHistorialAbierto = null;
+  document.getElementById("pantalla-detalle-historial").hidden = true;
+  document.getElementById("pantalla-historial").hidden = false;
+  renderizarHistorial();
+}
+
+function eliminarEntrenamientoGuardado() {
+  const historial = obtenerHistorial();
+  const item = historial[indiceHistorialAbierto];
+  if (!item) return volverAListaHistorial();
+  const fecha = new Date(item.inicio).toLocaleDateString("es-PE");
+  if (!confirm(`¿Eliminar definitivamente “${item.rutina.nombre}” del ${fecha}? Esta acción no se puede deshacer.`)) return;
+  historial.splice(indiceHistorialAbierto, 1);
+  localStorage.setItem("historialEntrenamientos", JSON.stringify(historial));
+  volverAListaHistorial();
 }
 
 function mostrarHoy() {
@@ -1253,6 +1379,17 @@ function inicializarEventosEntrenamiento() {
   document.getElementById("nav-historial").addEventListener("click", abrirHistorial);
   document.getElementById("nav-hoy").addEventListener("click", mostrarHoy);
   document.getElementById("btn-cerrar-historial").addEventListener("click", mostrarHoy);
+  document.getElementById("filtro-mes-historial").addEventListener("change", renderizarHistorial);
+  document.getElementById("btn-todo-historial").addEventListener("click", () => {
+    document.getElementById("filtro-mes-historial").value = "";
+    renderizarHistorial();
+  });
+  document.getElementById("lista-historial").addEventListener("click", (evento) => {
+    const boton = evento.target.closest("[data-indice-historial]");
+    if (boton) abrirDetalleHistorial(Number(boton.dataset.indiceHistorial));
+  });
+  document.getElementById("btn-volver-lista-historial").addEventListener("click", volverAListaHistorial);
+  document.getElementById("btn-eliminar-entrenamiento").addEventListener("click", eliminarEntrenamientoGuardado);
   document.getElementById("nav-nutricion").addEventListener("click", () => alert("Nutrición llegará en la Etapa 2."));
   document.getElementById("nav-progreso").addEventListener("click", () => alert("Progreso llegará en la Etapa 3."));
   document.getElementById("btn-iniciar-boxeo").addEventListener("click", iniciarTemporizadorBoxeo);

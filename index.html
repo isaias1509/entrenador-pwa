@@ -204,7 +204,23 @@
       <button class="btn-texto" id="btn-cerrar-historial">← Volver</button>
       <h1>Historial</h1>
     </header>
+    <section class="filtros-historial">
+      <label>Filtrar por mes
+        <input type="month" id="filtro-mes-historial" />
+      </label>
+      <button class="btn-texto" id="btn-todo-historial">Mostrar todo</button>
+    </section>
+    <p class="contador-historial" id="contador-historial"></p>
     <section id="lista-historial"></section>
+  </main>
+
+  <main class="app" id="pantalla-detalle-historial" hidden>
+    <header class="app-header header-entrenamiento">
+      <button class="btn-texto" id="btn-volver-lista-historial">← Historial</button>
+      <h1>Detalle</h1>
+    </header>
+    <section id="detalle-historial-contenido"></section>
+    <button class="btn-peligro btn-ancho btn-eliminar-entrenamiento" id="btn-eliminar-entrenamiento">Eliminar este entrenamiento</button>
   </main>
 
   <nav class="bottom-nav">

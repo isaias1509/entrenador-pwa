@@ -389,3 +389,36 @@ body {
   margin-top: 10px;
   font-size: 0.85rem;
 }
+
+.filtros-historial {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  background: #16161d;
+  border-radius: 12px;
+  padding: 12px;
+  margin-top: 18px;
+}
+.filtros-historial label { color: #8a8a92; font-size: 0.78rem; }
+.filtros-historial input {
+  display: block;
+  margin-top: 5px;
+  background: #24242c;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px;
+}
+.contador-historial { color: #8a8a92; font-size: 0.8rem; margin: 12px 2px 0; }
+.btn-ver-detalle { width: 100%; margin-top: 8px; }
+.detalle-cabecera h2 { margin-bottom: 5px; }
+.detalle-resumen { color: #a68cff !important; font-weight: 600; }
+.detalle-ejercicio { margin-top: 12px; padding-top: 12px; border-top: 1px solid #2a2a32; }
+.detalle-ejercicio:first-child { border-top: none; padding-top: 0; }
+.detalle-ejercicio h3 { font-size: 0.95rem; color: #e7e7eb; margin-bottom: 6px; }
+.detalle-serie { font-size: 0.84rem; color: #c6c6ce; padding: 3px 0; }
+.detalle-observacion { font-size: 0.8rem; color: #9696a0; font-style: italic; margin-top: 6px; }
+.comparacion-detalle { border-left: 3px solid #3b82f6; padding-left: 10px; margin-top: 12px; }
+.comparacion-detalle p { font-size: 0.84rem; }
+.btn-eliminar-entrenamiento { margin: 18px 0 30px; }
