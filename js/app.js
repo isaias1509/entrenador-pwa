@@ -4,6 +4,13 @@ function formatearFechaLarga(fecha) {
   return fecha.toLocaleDateString("es-ES", opciones);
 }
 
+function claveFechaLocal(fecha = new Date()) {
+  const anio = fecha.getFullYear();
+  const mes = String(fecha.getMonth() + 1).padStart(2, "0");
+  const dia = String(fecha.getDate()).padStart(2, "0");
+  return `${anio}-${mes}-${dia}`;
+}
+
 function calcularSemanaActual(fechaInicioStr) {
   const inicio = new Date(fechaInicioStr + "T00:00:00");
   const hoy = new Date();
@@ -43,15 +50,10 @@ function inicializarConfiguracion() {
 // ---------- Render de la pantalla "Hoy" ----------
 function renderizarPantallaHoy() {
   const hoy = new Date();
-  const selectorDia = document.getElementById("selector-dia-prueba");
-  const diaSeleccionado = selectorDia ? selectorDia.value : "actual";
-  const esVistaPrueba = diaSeleccionado !== "actual";
-  const diaSemana = esVistaPrueba ? Number(diaSeleccionado) : hoy.getDay();
+  const diaSemana = hoy.getDay();
   const rutina = RUTINAS[diaSemana];
 
-  document.getElementById("fecha").textContent = esVistaPrueba
-    ? `Vista de prueba: ${["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"][diaSemana]}`
-    : formatearFechaLarga(hoy);
+  document.getElementById("fecha").textContent = formatearFechaLarga(hoy);
 
   const fechaInicio = localStorage.getItem("fechaInicioPrograma");
   const semana = calcularSemanaActual(fechaInicio);
@@ -66,6 +68,13 @@ function renderizarPantallaHoy() {
   renderizarBoxeoOpcional(rutina, semana, diaSemana);
 
   const btnComenzar = document.getElementById("btn-comenzar");
+  const sesionPendiente = cargarSesionActiva();
+  if (sesionPendiente) {
+    btnComenzar.textContent = `Continuar: ${sesionPendiente.rutina.nombre}`;
+    btnComenzar.disabled = false;
+    btnComenzar.onclick = reanudarEntrenamiento;
+    return;
+  }
   if (rutina.tipo === "descanso") {
     btnComenzar.textContent = "Hoy es tu día de descanso 💤";
     btnComenzar.disabled = true;
@@ -204,7 +213,10 @@ function iniciarEntrenamiento(rutina) {
   sesion = {
     rutina,
     indiceEjercicio: 0,
-    registros: {}
+    registros: {},
+    fecha: claveFechaLocal(),
+    inicio: new Date().toISOString(),
+    actualizado: new Date().toISOString()
   };
   rutina.ejercicios.forEach((ej) => {
     sesion.registros[ej.id] = { series: [], observaciones: "" };
@@ -217,6 +229,35 @@ function iniciarEntrenamiento(rutina) {
   const automaticoGuardado = localStorage.getItem("descansoAutomatico");
   document.getElementById("check-descanso-automatico").checked = automaticoGuardado !== "false";
 
+  guardarSesionActiva();
+  renderizarEjercicioActual();
+}
+
+function guardarSesionActiva() {
+  if (!sesion) return;
+  sesion.actualizado = new Date().toISOString();
+  localStorage.setItem("sesionEntrenamientoActiva", JSON.stringify(sesion));
+}
+
+function cargarSesionActiva() {
+  try {
+    return JSON.parse(localStorage.getItem("sesionEntrenamientoActiva")) || null;
+  } catch (error) {
+    console.error("No se pudo leer la sesión activa:", error);
+    return null;
+  }
+}
+
+function reanudarEntrenamiento() {
+  const guardada = cargarSesionActiva();
+  if (!guardada) return renderizarPantallaHoy();
+  sesion = guardada;
+  document.getElementById("pantalla-hoy").hidden = true;
+  document.getElementById("pantalla-historial").hidden = true;
+  document.getElementById("pantalla-entrenamiento").hidden = false;
+  document.getElementById("nombre-rutina-entrenamiento").textContent = sesion.rutina.nombre;
+  const automaticoGuardado = localStorage.getItem("descansoAutomatico");
+  document.getElementById("check-descanso-automatico").checked = automaticoGuardado !== "false";
   renderizarEjercicioActual();
 }
 
@@ -254,8 +295,7 @@ function renderizarEjercicioActual() {
       `${ej.series} ${etiqueta} · ${ej.repsMin}-${ej.repsMax} reps`;
   }
 
-  document.getElementById("ultima-sesion-info").textContent =
-    "Sin registro previo todavía (esto se conecta con el historial más adelante).";
+  document.getElementById("ultima-sesion-info").textContent = obtenerTextoUltimaSesion(ej.id);
 
   const esTiempo = ej.tipoSerie === "tiempo";
   document.getElementById("campos-serie-reps").hidden = esTiempo;
@@ -343,6 +383,7 @@ function completarSerie() {
 
   registro.series.push(entrada);
   registro.observaciones = document.getElementById("input-observaciones").value;
+  guardarSesionActiva();
 
   const debeDescansar = !ej.unilateral || lado === "izquierda" && ej.comenzarPor !== "izquierda" || lado === "derecha" && ej.comenzarPor === "izquierda";
   const descansoAutomatico = document.getElementById("check-descanso-automatico").checked;
@@ -506,7 +547,9 @@ function actualizarBotonesNavegacion() {
 
 function irEjercicioAnterior() {
   if (sesion.indiceEjercicio > 0) {
+    guardarObservacionesActuales();
     sesion.indiceEjercicio--;
+    guardarSesionActiva();
     renderizarEjercicioActual();
   }
 }
@@ -514,15 +557,151 @@ function irEjercicioAnterior() {
 function irSiguienteEjercicioOFinalizar() {
   const esUltimo = sesion.indiceEjercicio === sesion.rutina.ejercicios.length - 1;
   if (esUltimo) {
-    alert("¡Buen trabajo! El resumen final y guardado en historial llegan en la Parte C 🙂");
-    salirEntrenamiento();
+    guardarObservacionesActuales();
+    guardarSesionActiva();
+    mostrarResumenFinal();
   } else {
+    guardarObservacionesActuales();
     sesion.indiceEjercicio++;
+    guardarSesionActiva();
     renderizarEjercicioActual();
   }
 }
 
+function guardarObservacionesActuales() {
+  if (!sesion) return;
+  const ej = obtenerEjercicioActual();
+  sesion.registros[ej.id].observaciones = document.getElementById("input-observaciones").value;
+}
+
+function obtenerHistorial() {
+  try {
+    return JSON.parse(localStorage.getItem("historialEntrenamientos")) || [];
+  } catch (error) {
+    console.error("No se pudo leer el historial:", error);
+    return [];
+  }
+}
+
+function calcularResumen(sesionActual) {
+  let ejercicios = 0;
+  let series = 0;
+  let reps = 0;
+  let volumen = 0;
+
+  sesionActual.rutina.ejercicios.forEach((ej) => {
+    const entradas = sesionActual.registros[ej.id]?.series || [];
+    if (entradas.length > 0) ejercicios++;
+    series += entradas.length;
+    entradas.forEach((entrada) => {
+      reps += entrada.reps || 0;
+      volumen += (entrada.peso || 0) * (entrada.reps || 0);
+    });
+  });
+
+  return { ejercicios, series, reps, volumen: Math.round(volumen * 10) / 10 };
+}
+
+function obtenerSesionAnterior(nombreRutina) {
+  return obtenerHistorial().filter((item) => item.rutina.nombre === nombreRutina).at(-1) || null;
+}
+
+function mostrarResumenFinal() {
+  detenerDescanso(false);
+  const resumen = calcularResumen(sesion);
+  const minutos = Math.max(1, Math.round((Date.now() - new Date(sesion.inicio).getTime()) / 60000));
+  const anterior = obtenerSesionAnterior(sesion.rutina.nombre);
+
+  document.getElementById("pantalla-entrenamiento").hidden = true;
+  document.getElementById("pantalla-resumen").hidden = false;
+  document.getElementById("resumen-rutina").textContent = sesion.rutina.nombre;
+  document.getElementById("resumen-duracion").textContent = `${minutos} min`;
+  document.getElementById("resumen-ejercicios").textContent = resumen.ejercicios;
+  document.getElementById("resumen-series").textContent = resumen.series;
+  document.getElementById("resumen-reps").textContent = resumen.reps;
+  document.getElementById("resumen-volumen").textContent = `Volumen aproximado: ${resumen.volumen.toLocaleString("es-PE")} kg`;
+  document.getElementById("input-sensaciones").value = sesion.sensaciones || "";
+
+  let comparacion = "Esta será tu primera sesión guardada de esta rutina.";
+  if (anterior) {
+    const diferencia = Math.round((resumen.volumen - anterior.resumen.volumen) * 10) / 10;
+    if (diferencia > 0) comparacion = `Mejoraste tu volumen en ${diferencia.toLocaleString("es-PE")} kg frente a la sesión anterior.`;
+    else if (diferencia < 0) comparacion = `Tu volumen fue ${Math.abs(diferencia).toLocaleString("es-PE")} kg menor que en la sesión anterior.`;
+    else comparacion = "Tu volumen fue igual al de la sesión anterior.";
+  }
+  document.getElementById("comparacion-resumen").textContent = comparacion;
+}
+
+function guardarEntrenamientoFinal() {
+  if (!sesion) return;
+  sesion.sensaciones = document.getElementById("input-sensaciones").value.trim();
+  sesion.fin = new Date().toISOString();
+  sesion.resumen = calcularResumen(sesion);
+
+  const historial = obtenerHistorial();
+  historial.push(sesion);
+  localStorage.setItem("historialEntrenamientos", JSON.stringify(historial));
+  localStorage.removeItem("sesionEntrenamientoActiva");
+
+  sesion = null;
+  document.getElementById("pantalla-resumen").hidden = true;
+  document.getElementById("pantalla-hoy").hidden = false;
+  renderizarPantallaHoy();
+  alert("Entrenamiento guardado correctamente 💪");
+}
+
+function obtenerTextoUltimaSesion(ejercicioId) {
+  const historial = obtenerHistorial();
+  for (let i = historial.length - 1; i >= 0; i--) {
+    const entradas = historial[i].registros?.[ejercicioId]?.series || [];
+    if (entradas.length === 0) continue;
+    const resumenSeries = entradas.map((s) => s.segundos ? `${s.segundos}s` : `${s.peso}kg × ${s.reps}`).join(", ");
+    return `Última sesión: ${resumenSeries}`;
+  }
+  return "Sin registro previo de este ejercicio.";
+}
+
+function abrirHistorial() {
+  if (sesion) guardarSesionActiva();
+  document.querySelectorAll("main.app").forEach((pantalla) => pantalla.hidden = true);
+  document.getElementById("pantalla-historial").hidden = false;
+  document.querySelectorAll(".nav-item").forEach((boton) => boton.classList.remove("active"));
+  document.getElementById("nav-historial").classList.add("active");
+  renderizarHistorial();
+}
+
+function renderizarHistorial() {
+  const contenedor = document.getElementById("lista-historial");
+  const historial = obtenerHistorial().slice().reverse();
+  if (historial.length === 0) {
+    contenedor.innerHTML = '<p class="historial-vacio">Todavía no tienes entrenamientos guardados.</p>';
+    return;
+  }
+
+  contenedor.innerHTML = historial.map((item) => {
+    const fecha = new Date(item.inicio).toLocaleDateString("es-PE", { day: "numeric", month: "long", year: "numeric" });
+    const minutos = Math.max(1, Math.round((new Date(item.fin) - new Date(item.inicio)) / 60000));
+    return `<article class="card historial-card">
+      <h2>${item.rutina.nombre}</h2>
+      <p class="historial-fecha">${fecha} · ${minutos} min</p>
+      <p class="historial-datos">${item.resumen.ejercicios} ejercicios · ${item.resumen.series} series · ${item.resumen.reps} reps</p>
+      <p class="historial-datos">Volumen aproximado: ${item.resumen.volumen.toLocaleString("es-PE")} kg</p>
+      ${item.sensaciones ? `<p class="historial-comentario">“${item.sensaciones}”</p>` : ""}
+    </article>`;
+  }).join("");
+}
+
+function mostrarHoy() {
+  document.querySelectorAll("main.app").forEach((pantalla) => pantalla.hidden = true);
+  document.getElementById("pantalla-hoy").hidden = false;
+  document.querySelectorAll(".nav-item").forEach((boton) => boton.classList.remove("active"));
+  document.getElementById("nav-hoy").classList.add("active");
+  renderizarPantallaHoy();
+}
+
 function salirEntrenamiento() {
+  guardarObservacionesActuales();
+  guardarSesionActiva();
   detenerDescanso(false);
   sesion = null;
   document.getElementById("pantalla-entrenamiento").hidden = true;
@@ -541,9 +720,25 @@ function inicializarEventosEntrenamiento() {
   document.getElementById("check-descanso-automatico").addEventListener("change", (evento) => {
     localStorage.setItem("descansoAutomatico", String(evento.target.checked));
   });
-  document.getElementById("selector-dia-prueba").addEventListener("change", renderizarPantallaHoy);
+  document.getElementById("input-observaciones").addEventListener("input", () => {
+    guardarObservacionesActuales();
+    guardarSesionActiva();
+  });
+  document.getElementById("btn-guardar-entrenamiento").addEventListener("click", guardarEntrenamientoFinal);
+  document.getElementById("btn-volver-entrenamiento").addEventListener("click", () => {
+    sesion.sensaciones = document.getElementById("input-sensaciones").value;
+    guardarSesionActiva();
+    document.getElementById("pantalla-resumen").hidden = true;
+    document.getElementById("pantalla-entrenamiento").hidden = false;
+    renderizarEjercicioActual();
+  });
+  document.getElementById("nav-historial").addEventListener("click", abrirHistorial);
+  document.getElementById("nav-hoy").addEventListener("click", mostrarHoy);
+  document.getElementById("btn-cerrar-historial").addEventListener("click", mostrarHoy);
+  document.getElementById("nav-nutricion").addEventListener("click", () => alert("Nutrición llegará en la Etapa 2."));
+  document.getElementById("nav-progreso").addEventListener("click", () => alert("Progreso llegará en la Etapa 3."));
   document.getElementById("btn-salir-entrenamiento").addEventListener("click", () => {
-    if (confirm("¿Seguro que quieres salir? El progreso de esta sesión aún no se guarda (eso llega en la Parte C).")) {
+    if (confirm("¿Salir por ahora? Tu progreso quedará guardado para continuar después.")) {
       salirEntrenamiento();
     }
   });

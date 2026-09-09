@@ -25,20 +25,6 @@
     </section>
 
     <div id="contenido-hoy" hidden>
-      <section class="modo-prueba">
-        <label for="selector-dia-prueba">🧪 Ver rutina de:</label>
-        <select id="selector-dia-prueba">
-          <option value="actual">Hoy (día real)</option>
-          <option value="1">Lunes</option>
-          <option value="2">Martes</option>
-          <option value="3">Miércoles</option>
-          <option value="4">Jueves</option>
-          <option value="5">Viernes</option>
-          <option value="6">Sábado</option>
-          <option value="0">Domingo</option>
-        </select>
-      </section>
-
       <header class="app-header">
         <h1 id="fecha">Cargando fecha...</h1>
         <p class="semana-actual" id="semana-actual"></p>
@@ -135,11 +121,45 @@
     </div>
   </main>
 
+  <main class="app" id="pantalla-resumen" hidden>
+    <header class="app-header">
+      <h1>Resumen del entrenamiento</h1>
+      <p class="semana-actual">Revisa tus resultados antes de guardarlos.</p>
+    </header>
+
+    <section class="card resumen-card">
+      <h2 id="resumen-rutina">—</h2>
+      <div class="resumen-grid">
+        <div><strong id="resumen-duracion">0 min</strong><span>Duración</span></div>
+        <div><strong id="resumen-ejercicios">0</strong><span>Ejercicios</span></div>
+        <div><strong id="resumen-series">0</strong><span>Series</span></div>
+        <div><strong id="resumen-reps">0</strong><span>Repeticiones</span></div>
+      </div>
+      <p class="resumen-volumen" id="resumen-volumen"></p>
+      <p class="comparacion-resumen" id="comparacion-resumen"></p>
+
+      <label class="observaciones-label">¿Cómo te sentiste?
+        <textarea id="input-sensaciones" placeholder="Energía, fuerza, molestias, comentario general..."></textarea>
+      </label>
+
+      <button class="btn-primario" id="btn-guardar-entrenamiento">Finalizar y guardar</button>
+      <button class="btn-secundario btn-ancho" id="btn-volver-entrenamiento">Volver al entrenamiento</button>
+    </section>
+  </main>
+
+  <main class="app" id="pantalla-historial" hidden>
+    <header class="app-header header-entrenamiento">
+      <button class="btn-texto" id="btn-cerrar-historial">← Volver</button>
+      <h1>Historial</h1>
+    </header>
+    <section id="lista-historial"></section>
+  </main>
+
   <nav class="bottom-nav">
-    <button class="nav-item active">Hoy</button>
-    <button class="nav-item">Nutrición</button>
-    <button class="nav-item">Progreso</button>
-    <button class="nav-item">Historial</button>
+    <button class="nav-item active" id="nav-hoy">Hoy</button>
+    <button class="nav-item" id="nav-nutricion">Nutrición</button>
+    <button class="nav-item" id="nav-progreso">Progreso</button>
+    <button class="nav-item" id="nav-historial">Historial</button>
   </nav>
 
   <script src="js/rutinas.js"></script>
