@@ -81,6 +81,8 @@
       </div>
 
       <button class="btn-primario" id="btn-completar-serie">Completar serie</button>
+      <button class="btn-secundario btn-ancho" id="btn-serie-extra" hidden>Añadir serie extra izquierda</button>
+      <button class="btn-secundario btn-ancho btn-omitir" id="btn-omitir-ejercicio" hidden>Omitir ejercicio opcional</button>
 
       <section class="descanso-card" id="descanso-card">
         <div class="descanso-encabezado">
@@ -121,6 +123,50 @@
     </div>
   </main>
 
+  <main class="app" id="pantalla-boxeo" hidden>
+    <header class="app-header header-entrenamiento">
+      <button class="btn-texto" id="btn-salir-boxeo">← Salir</button>
+      <h1 id="nombre-boxeo">Boxeo</h1>
+    </header>
+    <section class="card sesion-guiada-card">
+      <p class="progreso-ejercicio" id="progreso-boxeo"></p>
+      <h2 id="fase-boxeo">—</h2>
+      <p class="lado-indicador" id="estado-round-boxeo"></p>
+      <p class="objetivo-sesion" id="detalle-boxeo"></p>
+      <div class="cronometro cronometro-guiado" id="cronometro-boxeo">00:00</div>
+      <button class="btn-primario" id="btn-iniciar-boxeo">Comenzar</button>
+      <div class="controles-guiados">
+        <button class="btn-secundario" id="btn-pausar-boxeo" disabled>Pausar</button>
+        <button class="btn-secundario btn-omitir" id="btn-saltar-boxeo">Saltar segmento</button>
+      </div>
+    </section>
+  </main>
+
+  <main class="app" id="pantalla-cardio" hidden>
+    <header class="app-header header-entrenamiento">
+      <button class="btn-texto" id="btn-salir-cardio">← Salir</button>
+      <h1>Caminadora</h1>
+    </header>
+    <section class="card sesion-guiada-card">
+      <p class="progreso-ejercicio" id="progreso-cardio"></p>
+      <h2 id="fase-cardio">—</h2>
+      <p class="objetivo-sesion" id="objetivo-cardio"></p>
+      <div class="campos-serie">
+        <label>Minutos realizados
+          <input type="number" id="input-cardio-minutos" inputmode="decimal" step="0.5" />
+        </label>
+        <label>Velocidad usada
+          <input type="number" id="input-cardio-velocidad" inputmode="decimal" step="0.1" />
+        </label>
+        <label>Inclinación usada
+          <input type="number" id="input-cardio-inclinacion" inputmode="decimal" step="0.5" />
+        </label>
+      </div>
+      <button class="btn-primario" id="btn-completar-cardio">Completar fase</button>
+      <button class="btn-secundario btn-ancho btn-omitir" id="btn-omitir-cardio">Omitir caminadora</button>
+    </section>
+  </main>
+
   <main class="app" id="pantalla-resumen" hidden>
     <header class="app-header">
       <h1>Resumen del entrenamiento</h1>
@@ -131,9 +177,9 @@
       <h2 id="resumen-rutina">—</h2>
       <div class="resumen-grid">
         <div><strong id="resumen-duracion">0 min</strong><span>Duración</span></div>
-        <div><strong id="resumen-ejercicios">0</strong><span>Ejercicios</span></div>
-        <div><strong id="resumen-series">0</strong><span>Series</span></div>
-        <div><strong id="resumen-reps">0</strong><span>Repeticiones</span></div>
+        <div><strong id="resumen-ejercicios">0</strong><span id="etiqueta-resumen-ejercicios">Ejercicios</span></div>
+        <div><strong id="resumen-series">0</strong><span id="etiqueta-resumen-series">Series</span></div>
+        <div><strong id="resumen-reps">0</strong><span id="etiqueta-resumen-reps">Repeticiones</span></div>
       </div>
       <p class="resumen-volumen" id="resumen-volumen"></p>
       <p class="comparacion-resumen" id="comparacion-resumen"></p>

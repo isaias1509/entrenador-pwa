@@ -83,12 +83,9 @@ function renderizarPantallaHoy() {
     btnComenzar.disabled = false;
     btnComenzar.onclick = () => iniciarEntrenamiento(rutina);
   } else {
-    // boxeo / cardio: su propio flujo lo construimos más adelante
     btnComenzar.textContent = "Comenzar entrenamiento";
     btnComenzar.disabled = false;
-    btnComenzar.onclick = () => {
-      alert("El flujo de boxeo/cardio lo armamos en un paso aparte, distinto al de pesas 🙂");
-    };
+    btnComenzar.onclick = () => iniciarBoxeo(rutina);
   }
 }
 
@@ -193,7 +190,16 @@ function renderizarBoxeoOpcional(rutina, semanaActual, diaSemana) {
   contenedor.appendChild(div);
 
   document.getElementById("btn-activar-boxeo-opcional").addEventListener("click", () => {
-    alert("Perfecto, conectamos esta sesión opcional cuando armemos el flujo de boxeo 🙂");
+    if (cargarSesionActiva()) {
+      alert("Primero termina o continúa la sesión que tienes pendiente.");
+      return;
+    }
+    iniciarBoxeo({
+      nombre: "Boxeo opcional del sábado",
+      tipo: "boxeo",
+      fases: bo.fases,
+      esOpcional: true
+    });
   });
 }
 
@@ -212,6 +218,7 @@ function iniciarEntrenamiento(rutina) {
   detenerDescanso(false);
   sesion = {
     rutina,
+    tipoFlujo: "pesas",
     indiceEjercicio: 0,
     registros: {},
     fecha: claveFechaLocal(),
@@ -252,6 +259,14 @@ function reanudarEntrenamiento() {
   const guardada = cargarSesionActiva();
   if (!guardada) return renderizarPantallaHoy();
   sesion = guardada;
+  if (sesion.tipoFlujo === "boxeo") {
+    mostrarPantallaBoxeo();
+    return;
+  }
+  if (sesion.tipoFlujo === "cardio") {
+    mostrarPantallaCardio();
+    return;
+  }
   document.getElementById("pantalla-hoy").hidden = true;
   document.getElementById("pantalla-historial").hidden = true;
   document.getElementById("pantalla-entrenamiento").hidden = false;
@@ -271,6 +286,9 @@ function calcularNumeroSerieYLado(ej, registro) {
   }
   const ordenLados = ej.comenzarPor === "izquierda" ? ["izquierda", "derecha"] : ["derecha", "izquierda"];
   const entradasHechas = registro.series.length;
+  if (registro.extraActiva && entradasHechas >= ej.series * 2) {
+    return { numeroSerie: ej.series + 1, lado: ej.serieExtraOpcional, esExtra: true };
+  }
   const numeroSerie = Math.floor(entradasHechas / 2) + 1;
   const lado = ordenLados[entradasHechas % 2];
   return { numeroSerie, lado };
@@ -321,22 +339,30 @@ function renderizarEjercicioActual() {
 
 function actualizarIndicadorSerieYLado(ej, registro) {
   const totalSeries = ej.series;
-  const { numeroSerie, lado } = calcularNumeroSerieYLado(ej, registro);
+  const { numeroSerie, lado, esExtra } = calcularNumeroSerieYLado(ej, registro);
 
   const indicadorSerie = document.getElementById("serie-indicador");
   const indicadorLado = document.getElementById("lado-indicador");
 
-  indicadorSerie.textContent =
-    numeroSerie > totalSeries
+  indicadorSerie.textContent = esExtra
+    ? "Serie extra opcional"
+    : numeroSerie > totalSeries
       ? `Series completadas (${totalSeries} de ${totalSeries})`
       : `Serie ${numeroSerie} de ${totalSeries}`;
 
-  if (lado) {
+  if (lado && (numeroSerie <= totalSeries || esExtra)) {
     indicadorLado.hidden = false;
     indicadorLado.textContent = `Lado: ${lado === "derecha" ? "Derecho" : "Izquierdo"}`;
   } else {
     indicadorLado.hidden = true;
   }
+
+  const btnExtra = document.getElementById("btn-serie-extra");
+  const puedeAgregarExtra = Boolean(ej.serieExtraOpcional) && registro.series.length >= ej.series * 2 && !registro.extraActiva && !registro.extraCompletada;
+  btnExtra.hidden = !puedeAgregarExtra;
+
+  const btnOmitir = document.getElementById("btn-omitir-ejercicio");
+  btnOmitir.hidden = !ej.opcional || registro.series.length > 0;
 }
 
 function renderizarSeriesRegistradas(ej, registro) {
@@ -359,9 +385,9 @@ function renderizarSeriesRegistradas(ej, registro) {
 function completarSerie() {
   const ej = obtenerEjercicioActual();
   const registro = sesion.registros[ej.id];
-  const { numeroSerie, lado } = calcularNumeroSerieYLado(ej, registro);
+  const { numeroSerie, lado, esExtra } = calcularNumeroSerieYLado(ej, registro);
 
-  if (numeroSerie > ej.series) {
+  if (numeroSerie > ej.series && !esExtra) {
     alert("Ya completaste todas las series de este ejercicio. Puedes pasar al siguiente.");
     return;
   }
@@ -382,6 +408,10 @@ function completarSerie() {
   }
 
   registro.series.push(entrada);
+  if (esExtra) {
+    registro.extraActiva = false;
+    registro.extraCompletada = true;
+  }
   registro.observaciones = document.getElementById("input-observaciones").value;
   guardarSesionActiva();
 
@@ -554,12 +584,33 @@ function irEjercicioAnterior() {
   }
 }
 
+function activarSerieExtra() {
+  const ej = obtenerEjercicioActual();
+  const registro = sesion.registros[ej.id];
+  if (!ej.serieExtraOpcional || registro.extraCompletada) return;
+  registro.extraActiva = true;
+  guardarSesionActiva();
+  renderizarEjercicioActual();
+}
+
+function omitirEjercicioOpcional() {
+  const ej = obtenerEjercicioActual();
+  if (!ej.opcional) return;
+  sesion.registros[ej.id].omitido = true;
+  guardarSesionActiva();
+  irSiguienteEjercicioOFinalizar();
+}
+
 function irSiguienteEjercicioOFinalizar() {
   const esUltimo = sesion.indiceEjercicio === sesion.rutina.ejercicios.length - 1;
   if (esUltimo) {
     guardarObservacionesActuales();
     guardarSesionActiva();
-    mostrarResumenFinal();
+    if (sesion.rutina.cardio && !sesion.cardioCompletado && !sesion.cardioOmitido) {
+      iniciarCardioDeSesion();
+    } else {
+      mostrarResumenFinal();
+    }
   } else {
     guardarObservacionesActuales();
     sesion.indiceEjercicio++;
@@ -583,13 +634,215 @@ function obtenerHistorial() {
   }
 }
 
+// ---------- Flujo de boxeo ----------
+let temporizadorBoxeo = null;
+let finSegmentoBoxeoMs = null;
+let boxeoPausado = false;
+let ultimoSegundoGuardadoBoxeo = null;
+
+function iniciarBoxeo(rutina) {
+  detenerDescanso(false);
+  sesion = {
+    rutina,
+    tipoFlujo: "boxeo",
+    fecha: claveFechaLocal(),
+    inicio: new Date().toISOString(),
+    actualizado: new Date().toISOString(),
+    boxeo: { indiceFase: 0, round: 1, segmento: "trabajo", completados: [] }
+  };
+  prepararSegmentoBoxeo();
+  guardarSesionActiva();
+  mostrarPantallaBoxeo();
+}
+
+function mostrarPantallaBoxeo() {
+  document.querySelectorAll("main.app").forEach((pantalla) => pantalla.hidden = true);
+  document.getElementById("pantalla-boxeo").hidden = false;
+  document.getElementById("nombre-boxeo").textContent = sesion.rutina.nombre;
+  if (!sesion.boxeo.segundosRestantes) prepararSegmentoBoxeo();
+  renderizarBoxeoActivo();
+}
+
+function prepararSegmentoBoxeo() {
+  const fase = sesion.rutina.fases[sesion.boxeo.indiceFase];
+  if (!fase) return mostrarResumenFinal();
+  const esDescanso = sesion.boxeo.segmento === "descanso";
+  sesion.boxeo.segundosRestantes = (esDescanso ? fase.descansoMin : (fase.duracionMin || fase.minutos)) * 60;
+  boxeoPausado = false;
+}
+
+function renderizarBoxeoActivo() {
+  const estado = sesion.boxeo;
+  const fase = sesion.rutina.fases[estado.indiceFase];
+  if (!fase) return mostrarResumenFinal();
+
+  document.getElementById("progreso-boxeo").textContent = `Fase ${estado.indiceFase + 1} de ${sesion.rutina.fases.length}`;
+  document.getElementById("fase-boxeo").textContent = fase.nombre;
+  const etiqueta = document.getElementById("estado-round-boxeo");
+  etiqueta.classList.toggle("round-descanso", estado.segmento === "descanso");
+
+  if (fase.rounds) {
+    etiqueta.textContent = estado.segmento === "descanso" ? `Descanso después del round ${estado.round}` : `Round ${estado.round} de ${fase.rounds}`;
+    document.getElementById("detalle-boxeo").textContent = estado.segmento === "descanso"
+      ? `${fase.descansoMin} minuto de recuperación`
+      : `${fase.duracionMin} minutos de trabajo`;
+  } else {
+    etiqueta.textContent = "Trabajo continuo";
+    document.getElementById("detalle-boxeo").textContent = `${fase.minutos} minutos`;
+  }
+  actualizarVistaBoxeo();
+}
+
+function actualizarVistaBoxeo() {
+  document.getElementById("cronometro-boxeo").textContent = formatearTiempo(sesion?.boxeo?.segundosRestantes || 0);
+}
+
+function iniciarTemporizadorBoxeo() {
+  if (!sesion || sesion.tipoFlujo !== "boxeo") return;
+  activarAudio();
+  if (temporizadorBoxeo) clearInterval(temporizadorBoxeo);
+  finSegmentoBoxeoMs = Date.now() + sesion.boxeo.segundosRestantes * 1000;
+  boxeoPausado = false;
+  document.getElementById("btn-iniciar-boxeo").textContent = "Reiniciar segmento";
+  document.getElementById("btn-iniciar-boxeo").disabled = true;
+  document.getElementById("btn-pausar-boxeo").textContent = "Pausar";
+  document.getElementById("btn-pausar-boxeo").disabled = false;
+  actualizarCuentaBoxeo();
+  temporizadorBoxeo = setInterval(actualizarCuentaBoxeo, 250);
+}
+
+function actualizarCuentaBoxeo() {
+  if (!finSegmentoBoxeoMs || !sesion) return;
+  sesion.boxeo.segundosRestantes = Math.max(0, (finSegmentoBoxeoMs - Date.now()) / 1000);
+  actualizarVistaBoxeo();
+  const segundoActual = Math.ceil(sesion.boxeo.segundosRestantes);
+  if (segundoActual > 0 && segundoActual % 5 === 0 && segundoActual !== ultimoSegundoGuardadoBoxeo) {
+    ultimoSegundoGuardadoBoxeo = segundoActual;
+    guardarSesionActiva();
+  }
+  if (sesion.boxeo.segundosRestantes <= 0) completarSegmentoBoxeo();
+}
+
+function pausarOReanudarBoxeo() {
+  if (boxeoPausado) return iniciarTemporizadorBoxeo();
+  if (!temporizadorBoxeo) return;
+  actualizarCuentaBoxeo();
+  clearInterval(temporizadorBoxeo);
+  temporizadorBoxeo = null;
+  finSegmentoBoxeoMs = null;
+  boxeoPausado = true;
+  document.getElementById("btn-pausar-boxeo").textContent = "Reanudar";
+  document.getElementById("btn-iniciar-boxeo").disabled = false;
+  guardarSesionActiva();
+}
+
+function detenerTemporizadorBoxeo() {
+  if (temporizadorBoxeo) clearInterval(temporizadorBoxeo);
+  temporizadorBoxeo = null;
+  finSegmentoBoxeoMs = null;
+  boxeoPausado = false;
+}
+
+function completarSegmentoBoxeo(omitido = false) {
+  detenerTemporizadorBoxeo();
+  reproducirAviso();
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+
+  const estado = sesion.boxeo;
+  const fase = sesion.rutina.fases[estado.indiceFase];
+  if (fase.rounds && estado.segmento === "trabajo" && estado.round < fase.rounds) {
+    estado.completados.push({ fase: fase.nombre, round: estado.round, tipo: omitido ? "omitido" : "trabajo" });
+    estado.segmento = "descanso";
+  } else if (fase.rounds && estado.segmento === "descanso") {
+    estado.completados.push({ fase: fase.nombre, round: estado.round, tipo: omitido ? "omitido" : "descanso" });
+    estado.round++;
+    estado.segmento = "trabajo";
+  } else {
+    estado.completados.push({ fase: fase.nombre, round: fase.rounds ? estado.round : null, tipo: omitido ? "omitido" : "trabajo" });
+    estado.indiceFase++;
+    estado.round = 1;
+    estado.segmento = "trabajo";
+  }
+
+  if (estado.indiceFase >= sesion.rutina.fases.length) {
+    guardarSesionActiva();
+    mostrarResumenFinal();
+    return;
+  }
+  prepararSegmentoBoxeo();
+  guardarSesionActiva();
+  renderizarBoxeoActivo();
+  document.getElementById("btn-iniciar-boxeo").textContent = "Comenzar";
+  document.getElementById("btn-iniciar-boxeo").disabled = false;
+  document.getElementById("btn-pausar-boxeo").disabled = true;
+}
+
+// ---------- Caminadora del martes ----------
+function iniciarCardioDeSesion() {
+  sesion.tipoFlujo = "cardio";
+  sesion.cardio = sesion.cardio || { indiceFase: 0, registros: [] };
+  guardarSesionActiva();
+  mostrarPantallaCardio();
+}
+
+function mostrarPantallaCardio() {
+  document.querySelectorAll("main.app").forEach((pantalla) => pantalla.hidden = true);
+  document.getElementById("pantalla-cardio").hidden = false;
+  renderizarFaseCardio();
+}
+
+function renderizarFaseCardio() {
+  const cardio = sesion.rutina.cardio;
+  const estado = sesion.cardio;
+  const fase = cardio.fases[estado.indiceFase];
+  if (!fase) return finalizarCardio();
+  const minutos = fase.minutosMin ? `${fase.minutosMin}–${fase.minutosMax}` : fase.minutos;
+  document.getElementById("progreso-cardio").textContent = `Fase ${estado.indiceFase + 1} de ${cardio.fases.length}`;
+  document.getElementById("fase-cardio").textContent = fase.nombre;
+  const unidad = localStorage.getItem("unidadVelocidad") || "km/h";
+  document.getElementById("objetivo-cardio").textContent = `${minutos} min · velocidad ${fase.velocidad} ${unidad} · inclinación ${fase.inclinacion}`;
+  document.getElementById("input-cardio-minutos").value = fase.minutos || fase.minutosMin || "";
+  document.getElementById("input-cardio-velocidad").value = String(fase.velocidad).split(/[–-]/)[0];
+  document.getElementById("input-cardio-inclinacion").value = String(fase.inclinacion).split(/[–-]/)[0];
+}
+
+function completarFaseCardio() {
+  const minutos = Number(document.getElementById("input-cardio-minutos").value);
+  const velocidad = Number(document.getElementById("input-cardio-velocidad").value);
+  const inclinacion = Number(document.getElementById("input-cardio-inclinacion").value);
+  if (minutos <= 0 || velocidad < 0 || inclinacion < 0) return alert("Completa correctamente los datos de esta fase.");
+  sesion.cardio.registros.push({
+    nombre: sesion.rutina.cardio.fases[sesion.cardio.indiceFase].nombre,
+    minutos, velocidad, inclinacion
+  });
+  sesion.cardio.indiceFase++;
+  guardarSesionActiva();
+  if (sesion.cardio.indiceFase >= sesion.rutina.cardio.fases.length) finalizarCardio();
+  else renderizarFaseCardio();
+}
+
+function finalizarCardio() {
+  sesion.cardioCompletado = true;
+  sesion.tipoFlujo = "pesas";
+  guardarSesionActiva();
+  mostrarResumenFinal();
+}
+
+function omitirCardio() {
+  if (!confirm("¿Omitir la caminadora de hoy?")) return;
+  sesion.cardioOmitido = true;
+  sesion.tipoFlujo = "pesas";
+  guardarSesionActiva();
+  mostrarResumenFinal();
+}
+
 function calcularResumen(sesionActual) {
   let ejercicios = 0;
   let series = 0;
   let reps = 0;
   let volumen = 0;
 
-  sesionActual.rutina.ejercicios.forEach((ej) => {
+  (sesionActual.rutina.ejercicios || []).forEach((ej) => {
     const entradas = sesionActual.registros[ej.id]?.series || [];
     if (entradas.length > 0) ejercicios++;
     series += entradas.length;
@@ -599,7 +852,10 @@ function calcularResumen(sesionActual) {
     });
   });
 
-  return { ejercicios, series, reps, volumen: Math.round(volumen * 10) / 10 };
+  const roundsBoxeo = sesionActual.boxeo?.completados.filter((item) => item.tipo === "trabajo" && item.round).length || 0;
+  const fasesBoxeo = new Set((sesionActual.boxeo?.completados || []).filter((item) => item.tipo === "trabajo").map((item) => item.fase)).size;
+  const minutosCardio = (sesionActual.cardio?.registros || []).reduce((total, item) => total + item.minutos, 0);
+  return { ejercicios, series, reps, volumen: Math.round(volumen * 10) / 10, roundsBoxeo, fasesBoxeo, minutosCardio };
 }
 
 function obtenerSesionAnterior(nombreRutina) {
@@ -608,22 +864,35 @@ function obtenerSesionAnterior(nombreRutina) {
 
 function mostrarResumenFinal() {
   detenerDescanso(false);
+  detenerTemporizadorBoxeo();
   const resumen = calcularResumen(sesion);
   const minutos = Math.max(1, Math.round((Date.now() - new Date(sesion.inicio).getTime()) / 60000));
   const anterior = obtenerSesionAnterior(sesion.rutina.nombre);
 
-  document.getElementById("pantalla-entrenamiento").hidden = true;
+  document.querySelectorAll("main.app").forEach((pantalla) => pantalla.hidden = true);
   document.getElementById("pantalla-resumen").hidden = false;
   document.getElementById("resumen-rutina").textContent = sesion.rutina.nombre;
   document.getElementById("resumen-duracion").textContent = `${minutos} min`;
-  document.getElementById("resumen-ejercicios").textContent = resumen.ejercicios;
-  document.getElementById("resumen-series").textContent = resumen.series;
-  document.getElementById("resumen-reps").textContent = resumen.reps;
-  document.getElementById("resumen-volumen").textContent = `Volumen aproximado: ${resumen.volumen.toLocaleString("es-PE")} kg`;
+  if (sesion.rutina.tipo === "boxeo") {
+    document.getElementById("resumen-ejercicios").textContent = resumen.fasesBoxeo;
+    document.getElementById("resumen-series").textContent = resumen.roundsBoxeo;
+    document.getElementById("resumen-reps").textContent = "—";
+    document.getElementById("resumen-volumen").textContent = `${resumen.fasesBoxeo} fases y ${resumen.roundsBoxeo} rounds completados`;
+  } else {
+    document.getElementById("resumen-ejercicios").textContent = resumen.ejercicios;
+    document.getElementById("resumen-series").textContent = resumen.series;
+    document.getElementById("resumen-reps").textContent = resumen.reps;
+    const cardioTexto = resumen.minutosCardio ? ` · Caminadora: ${resumen.minutosCardio} min` : "";
+    document.getElementById("resumen-volumen").textContent = `Volumen aproximado: ${resumen.volumen.toLocaleString("es-PE")} kg${cardioTexto}`;
+  }
   document.getElementById("input-sensaciones").value = sesion.sensaciones || "";
+  document.getElementById("btn-volver-entrenamiento").hidden = sesion.rutina.tipo === "boxeo";
 
   let comparacion = "Esta será tu primera sesión guardada de esta rutina.";
-  if (anterior) {
+  document.getElementById("etiqueta-resumen-ejercicios").textContent = sesion.rutina.tipo === "boxeo" ? "Fases" : "Ejercicios";
+  document.getElementById("etiqueta-resumen-series").textContent = sesion.rutina.tipo === "boxeo" ? "Rounds" : "Series";
+  document.getElementById("etiqueta-resumen-reps").textContent = sesion.rutina.tipo === "boxeo" ? "Golpes" : "Repeticiones";
+  if (anterior && sesion.rutina.tipo !== "boxeo") {
     const diferencia = Math.round((resumen.volumen - anterior.resumen.volumen) * 10) / 10;
     if (diferencia > 0) comparacion = `Mejoraste tu volumen en ${diferencia.toLocaleString("es-PE")} kg frente a la sesión anterior.`;
     else if (diferencia < 0) comparacion = `Tu volumen fue ${Math.abs(diferencia).toLocaleString("es-PE")} kg menor que en la sesión anterior.`;
@@ -662,6 +931,7 @@ function obtenerTextoUltimaSesion(ejercicioId) {
 }
 
 function abrirHistorial() {
+  if (temporizadorBoxeo) pausarOReanudarBoxeo();
   if (sesion) guardarSesionActiva();
   document.querySelectorAll("main.app").forEach((pantalla) => pantalla.hidden = true);
   document.getElementById("pantalla-historial").hidden = false;
@@ -681,17 +951,22 @@ function renderizarHistorial() {
   contenedor.innerHTML = historial.map((item) => {
     const fecha = new Date(item.inicio).toLocaleDateString("es-PE", { day: "numeric", month: "long", year: "numeric" });
     const minutos = Math.max(1, Math.round((new Date(item.fin) - new Date(item.inicio)) / 60000));
+    const detalle = item.rutina.tipo === "boxeo"
+      ? `${item.resumen.fasesBoxeo || 0} fases · ${item.resumen.roundsBoxeo || 0} rounds`
+      : `${item.resumen.ejercicios} ejercicios · ${item.resumen.series} series · ${item.resumen.reps} reps`;
+    const volumen = item.rutina.tipo === "boxeo" ? "" : `<p class="historial-datos">Volumen aproximado: ${item.resumen.volumen.toLocaleString("es-PE")} kg${item.resumen.minutosCardio ? ` · Caminadora: ${item.resumen.minutosCardio} min` : ""}</p>`;
     return `<article class="card historial-card">
       <h2>${item.rutina.nombre}</h2>
       <p class="historial-fecha">${fecha} · ${minutos} min</p>
-      <p class="historial-datos">${item.resumen.ejercicios} ejercicios · ${item.resumen.series} series · ${item.resumen.reps} reps</p>
-      <p class="historial-datos">Volumen aproximado: ${item.resumen.volumen.toLocaleString("es-PE")} kg</p>
+      <p class="historial-datos">${detalle}</p>
+      ${volumen}
       ${item.sensaciones ? `<p class="historial-comentario">“${item.sensaciones}”</p>` : ""}
     </article>`;
   }).join("");
 }
 
 function mostrarHoy() {
+  if (temporizadorBoxeo) pausarOReanudarBoxeo();
   document.querySelectorAll("main.app").forEach((pantalla) => pantalla.hidden = true);
   document.getElementById("pantalla-hoy").hidden = false;
   document.querySelectorAll(".nav-item").forEach((boton) => boton.classList.remove("active"));
@@ -706,6 +981,27 @@ function salirEntrenamiento() {
   sesion = null;
   document.getElementById("pantalla-entrenamiento").hidden = true;
   document.getElementById("pantalla-hoy").hidden = false;
+  renderizarPantallaHoy();
+}
+
+function salirBoxeo() {
+  if (!confirm("¿Salir por ahora? El avance quedará guardado para continuar después.")) return;
+  if (temporizadorBoxeo) pausarOReanudarBoxeo();
+  guardarSesionActiva();
+  detenerTemporizadorBoxeo();
+  sesion = null;
+  document.getElementById("pantalla-boxeo").hidden = true;
+  document.getElementById("pantalla-hoy").hidden = false;
+  renderizarPantallaHoy();
+}
+
+function salirCardio() {
+  if (!confirm("¿Salir por ahora? Las fases completadas quedarán guardadas.")) return;
+  guardarSesionActiva();
+  sesion = null;
+  document.getElementById("pantalla-cardio").hidden = true;
+  document.getElementById("pantalla-hoy").hidden = false;
+  renderizarPantallaHoy();
 }
 
 function inicializarEventosEntrenamiento() {
@@ -717,6 +1013,8 @@ function inicializarEventosEntrenamiento() {
   document.getElementById("btn-saltar-descanso").addEventListener("click", () => detenerDescanso(true));
   document.getElementById("btn-sumar-15").addEventListener("click", () => ajustarDescanso(15));
   document.getElementById("btn-restar-15").addEventListener("click", () => ajustarDescanso(-15));
+  document.getElementById("btn-serie-extra").addEventListener("click", activarSerieExtra);
+  document.getElementById("btn-omitir-ejercicio").addEventListener("click", omitirEjercicioOpcional);
   document.getElementById("check-descanso-automatico").addEventListener("change", (evento) => {
     localStorage.setItem("descansoAutomatico", String(evento.target.checked));
   });
@@ -737,6 +1035,13 @@ function inicializarEventosEntrenamiento() {
   document.getElementById("btn-cerrar-historial").addEventListener("click", mostrarHoy);
   document.getElementById("nav-nutricion").addEventListener("click", () => alert("Nutrición llegará en la Etapa 2."));
   document.getElementById("nav-progreso").addEventListener("click", () => alert("Progreso llegará en la Etapa 3."));
+  document.getElementById("btn-iniciar-boxeo").addEventListener("click", iniciarTemporizadorBoxeo);
+  document.getElementById("btn-pausar-boxeo").addEventListener("click", pausarOReanudarBoxeo);
+  document.getElementById("btn-saltar-boxeo").addEventListener("click", () => completarSegmentoBoxeo(true));
+  document.getElementById("btn-salir-boxeo").addEventListener("click", salirBoxeo);
+  document.getElementById("btn-completar-cardio").addEventListener("click", completarFaseCardio);
+  document.getElementById("btn-omitir-cardio").addEventListener("click", omitirCardio);
+  document.getElementById("btn-salir-cardio").addEventListener("click", salirCardio);
   document.getElementById("btn-salir-entrenamiento").addEventListener("click", () => {
     if (confirm("¿Salir por ahora? Tu progreso quedará guardado para continuar después.")) {
       salirEntrenamiento();

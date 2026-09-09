@@ -319,3 +319,11 @@ body {
 .historial-fecha { color: #8a8a92 !important; font-size: 0.8rem; }
 .historial-datos { color: #cfcfd6 !important; font-size: 0.86rem; }
 .historial-comentario { font-style: italic; font-size: 0.82rem; }
+
+.btn-omitir { border-color: #59606b; color: #aeb4bd; }
+.sesion-guiada-card h2 { margin: 8px 0; text-align: center; }
+.objetivo-sesion { text-align: center; color: #cfcfd6 !important; margin: 10px 0 !important; }
+.cronometro-guiado { color: #a68cff; }
+.controles-guiados { display: flex; gap: 10px; margin-top: 10px; }
+.controles-guiados button { flex: 1; min-height: 46px; }
+.round-descanso { color: #22c55e !important; }
