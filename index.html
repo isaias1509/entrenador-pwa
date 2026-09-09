@@ -128,6 +128,87 @@
     </div>
   </main>
 
+  <main class="app" id="pantalla-nutricion" hidden>
+    <header class="app-header nutricion-header">
+      <div>
+        <h1>Nutrición</h1>
+        <p class="semana-actual">Registro diario de macros y suplementos</p>
+      </div>
+      <input type="date" id="fecha-nutricion" />
+    </header>
+
+    <section class="card objetivos-card">
+      <div class="titulo-con-accion">
+        <h2>Objetivos del día</h2>
+        <button class="btn-texto" id="btn-editar-objetivos">Editar</button>
+      </div>
+      <div id="barras-macros"></div>
+    </section>
+
+    <section class="card" id="form-objetivos" hidden>
+      <h2>Configurar objetivos</h2>
+      <div class="grid-campos">
+        <label>Calorías<input type="number" id="objetivo-kcal" inputmode="numeric" /></label>
+        <label>Proteína (g)<input type="number" id="objetivo-proteina" inputmode="numeric" /></label>
+        <label>Carbohidratos (g)<input type="number" id="objetivo-carbohidratos" inputmode="numeric" /></label>
+        <label>Grasas (g)<input type="number" id="objetivo-grasas" inputmode="numeric" /></label>
+        <label>Agua (ml)<input type="number" id="objetivo-agua" inputmode="numeric" step="250" /></label>
+        <label>Creatina (g)<input type="number" id="objetivo-creatina" inputmode="decimal" step="0.5" /></label>
+      </div>
+      <button class="btn-primario" id="btn-guardar-objetivos">Guardar objetivos</button>
+      <button class="btn-secundario btn-ancho" id="btn-cancelar-objetivos">Cancelar</button>
+    </section>
+
+    <section class="card">
+      <h2>Accesos rápidos</h2>
+      <div class="acceso-rapido-bloque">
+        <h3>💧 Agua</h3>
+        <div class="botones-rapidos">
+          <button class="btn-chip" data-agua="250">+250 ml</button>
+          <button class="btn-chip" data-agua="500">+500 ml</button>
+          <button class="btn-chip btn-chip-restar" data-agua="-250">−250 ml</button>
+        </div>
+        <div class="entrada-rapida"><input type="number" id="agua-personalizada" placeholder="Cantidad en ml" inputmode="numeric" /><button class="btn-secundario" id="btn-agua-personalizada">Añadir</button></div>
+      </div>
+
+      <div class="acceso-rapido-bloque">
+        <h3>⚡ Creatina</h3>
+        <p class="nota">Tu meta: 2 scoops de 2.5 g = 5 g diarios.</p>
+        <button class="btn-chip" id="btn-creatina">Marcar 5 g tomados</button>
+      </div>
+
+      <div class="acceso-rapido-bloque">
+        <h3>🥤 BIG M</h3>
+        <p class="nota">Por scoop: aprox. 134 kcal, 11.3 g proteína y 20 g carbohidratos.</p>
+        <div class="entrada-rapida"><input type="number" id="bigm-scoops" value="1.5" min="0.5" step="0.5" inputmode="decimal" /><button class="btn-secundario" id="btn-agregar-bigm">Añadir BIG M</button></div>
+      </div>
+    </section>
+
+    <button class="btn-primario btn-grande" id="btn-mostrar-form-comida">+ Registrar comida</button>
+
+    <section class="card" id="form-comida" hidden>
+      <h2 id="titulo-form-comida">Registrar comida</h2>
+      <div class="grid-campos">
+        <label>Momento
+          <select id="comida-tipo"><option>Desayuno</option><option>Almuerzo</option><option>Cena</option><option>Snack</option></select>
+        </label>
+        <label>Alimento o plato<input type="text" id="comida-nombre" placeholder="Ej. ají de gallina" /></label>
+        <label>Cantidad<input type="number" id="comida-cantidad" inputmode="decimal" step="0.1" /></label>
+        <label>Unidad<select id="comida-unidad"><option>gramos</option><option>unidad</option><option>porción</option><option>taza</option><option>cucharada</option><option>scoop</option></select></label>
+        <label>Calorías<input type="number" id="comida-kcal" inputmode="decimal" step="0.1" /></label>
+        <label>Proteína (g)<input type="number" id="comida-proteina" inputmode="decimal" step="0.1" /></label>
+        <label>Carbohidratos (g)<input type="number" id="comida-carbohidratos" inputmode="decimal" step="0.1" /></label>
+        <label>Grasas (g)<input type="number" id="comida-grasas" inputmode="decimal" step="0.1" /></label>
+        <label>Hora<input type="time" id="comida-hora" /></label>
+      </div>
+      <label class="observaciones-label">Comentario<textarea id="comida-comentario" placeholder="Preparación, hambre, observación..."></textarea></label>
+      <button class="btn-primario" id="btn-guardar-comida">Guardar comida</button>
+      <button class="btn-secundario btn-ancho" id="btn-cancelar-comida">Cancelar</button>
+    </section>
+
+    <section id="lista-comidas-dia"></section>
+  </main>
+
   <main class="app" id="pantalla-boxeo" hidden>
     <header class="app-header header-entrenamiento">
       <button class="btn-texto" id="btn-salir-boxeo">← Salir</button>

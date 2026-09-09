@@ -422,3 +422,70 @@ body {
 .comparacion-detalle { border-left: 3px solid #3b82f6; padding-left: 10px; margin-top: 12px; }
 .comparacion-detalle p { font-size: 0.84rem; }
 .btn-eliminar-entrenamiento { margin: 18px 0 30px; }
+
+.nutricion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.nutricion-header input {
+  max-width: 145px;
+  background: #1c1c24;
+  color: #fff;
+  border: 1px solid #30303a;
+  border-radius: 9px;
+  padding: 8px;
+}
+.titulo-con-accion { display: flex; justify-content: space-between; align-items: center; }
+.objetivos-card h2, #form-objetivos h2, #form-comida h2 { font-size: 1.05rem; }
+.macro-fila { margin-top: 13px; }
+.macro-cabecera { display: flex; justify-content: space-between; gap: 10px; font-size: 0.8rem; color: #bfc0c8; }
+.barra-fondo { height: 9px; background: #292933; border-radius: 999px; overflow: hidden; margin-top: 5px; }
+.barra-progreso { height: 100%; background: linear-gradient(90deg, #3b82f6, #a68cff); border-radius: inherit; transition: width .25s; }
+.barra-progreso.completo { background: #22c55e; }
+.barra-progreso.exceso { background: #f59e0b; }
+
+.grid-campos { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; }
+.grid-campos label { display: flex; flex-direction: column; gap: 4px; color: #8a8a92; font-size: 0.78rem; }
+.grid-campos input, .grid-campos select, .entrada-rapida input {
+  width: 100%;
+  background: #1c1c24;
+  color: #fff;
+  border: 1px solid #30303a;
+  border-radius: 9px;
+  padding: 11px;
+  font-size: 0.95rem;
+}
+.grid-campos label:nth-child(2) { grid-column: auto; }
+.acceso-rapido-bloque { padding: 13px 0; border-bottom: 1px solid #292932; }
+.acceso-rapido-bloque:last-child { border-bottom: none; }
+.acceso-rapido-bloque h3 { font-size: 0.95rem; margin-bottom: 7px; }
+.botones-rapidos { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn-chip {
+  background: #172840;
+  color: #bfdbfe;
+  border: 1px solid #31547f;
+  border-radius: 999px;
+  padding: 9px 13px;
+  font-weight: 650;
+}
+.btn-chip-restar { background: #281b1b; color: #fca5a5; border-color: #633333; }
+.btn-chip.tomado { background: #12331f; color: #86efac; border-color: #287a47; }
+.entrada-rapida { display: flex; align-items: stretch; gap: 8px; margin-top: 9px; }
+.entrada-rapida .btn-secundario { margin-top: 0; white-space: nowrap; }
+
+.grupo-comidas h2 { margin: 22px 2px 8px; font-size: 1rem; color: #a68cff; }
+.comida-card { margin-top: 9px; }
+.comida-cabecera { display: flex; justify-content: space-between; gap: 8px; }
+.comida-cabecera h3 { font-size: 0.95rem; }
+.comida-hora { color: #8a8a92; font-size: 0.78rem; }
+.comida-macros { color: #cfcfd6 !important; font-size: 0.82rem; }
+.comida-cantidad { color: #8a8a92 !important; font-size: 0.78rem; }
+.acciones-comida { display: flex; gap: 8px; margin-top: 9px; }
+.acciones-comida button { flex: 1; }
+
+@media (max-width: 380px) {
+  .grid-campos { grid-template-columns: 1fr; }
+  .nutricion-header { align-items: flex-start; flex-direction: column; }
+}

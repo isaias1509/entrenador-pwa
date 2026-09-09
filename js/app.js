@@ -233,6 +233,7 @@ function renderizarBoxeoOpcional(rutina, semanaActual, diaSemana) {
 let sesion = null;
 let indiceEdicionSerie = null;
 let indiceHistorialAbierto = null;
+let indiceComidaEditando = null;
 let temporizadorDescanso = null;
 let finDescansoMs = null;
 let segundosRestantes = 0;
@@ -1291,6 +1292,264 @@ function eliminarEntrenamientoGuardado() {
   volverAListaHistorial();
 }
 
+// ============================================================
+// NUTRICIÓN Y MACROS
+// ============================================================
+const OBJETIVOS_NUTRICION_INICIALES = {
+  kcal: 2200,
+  proteina: 150,
+  carbohidratos: 240,
+  grasas: 70,
+  aguaMl: 3000,
+  creatinaG: 5
+};
+
+function obtenerObjetivosNutricion() {
+  try {
+    return { ...OBJETIVOS_NUTRICION_INICIALES, ...(JSON.parse(localStorage.getItem("objetivosNutricion")) || {}) };
+  } catch (error) {
+    return { ...OBJETIVOS_NUTRICION_INICIALES };
+  }
+}
+
+function obtenerTodosLosDiasNutricion() {
+  try {
+    return JSON.parse(localStorage.getItem("nutricionPorFecha")) || {};
+  } catch (error) {
+    console.error("No se pudo leer nutrición:", error);
+    return {};
+  }
+}
+
+function fechaNutricionActual() {
+  return document.getElementById("fecha-nutricion").value || claveFechaLocal();
+}
+
+function obtenerNutricionDelDia(fecha = fechaNutricionActual()) {
+  const todos = obtenerTodosLosDiasNutricion();
+  return todos[fecha] || { comidas: [], aguaMl: 0, creatinaG: 0, creatinaHora: null };
+}
+
+function guardarNutricionDelDia(datos, fecha = fechaNutricionActual()) {
+  const todos = obtenerTodosLosDiasNutricion();
+  todos[fecha] = datos;
+  localStorage.setItem("nutricionPorFecha", JSON.stringify(todos));
+}
+
+function calcularTotalesNutricion(datos) {
+  return datos.comidas.reduce((totales, comida) => {
+    totales.kcal += Number(comida.kcal) || 0;
+    totales.proteina += Number(comida.proteina) || 0;
+    totales.carbohidratos += Number(comida.carbohidratos) || 0;
+    totales.grasas += Number(comida.grasas) || 0;
+    return totales;
+  }, { kcal: 0, proteina: 0, carbohidratos: 0, grasas: 0 });
+}
+
+function mostrarNutricion() {
+  if (temporizadorBoxeo) pausarOReanudarBoxeo();
+  if (temporizadorDescanso) detenerDescanso(false);
+  if (sesion) guardarSesionActiva();
+  document.querySelectorAll("main.app").forEach((pantalla) => pantalla.hidden = true);
+  document.getElementById("pantalla-nutricion").hidden = false;
+  document.querySelectorAll(".nav-item").forEach((boton) => boton.classList.remove("active"));
+  document.getElementById("nav-nutricion").classList.add("active");
+  if (!document.getElementById("fecha-nutricion").value) document.getElementById("fecha-nutricion").value = claveFechaLocal();
+  cerrarFormularioComida();
+  document.getElementById("form-objetivos").hidden = true;
+  renderizarNutricion();
+}
+
+function renderizarNutricion() {
+  const datos = obtenerNutricionDelDia();
+  const objetivos = obtenerObjetivosNutricion();
+  const totales = calcularTotalesNutricion(datos);
+  const barras = [
+    ["Calorías", totales.kcal, objetivos.kcal, "kcal"],
+    ["Proteína", totales.proteina, objetivos.proteina, "g"],
+    ["Carbohidratos", totales.carbohidratos, objetivos.carbohidratos, "g"],
+    ["Grasas", totales.grasas, objetivos.grasas, "g"],
+    ["Agua", datos.aguaMl, objetivos.aguaMl, "ml"],
+    ["Creatina", datos.creatinaG, objetivos.creatinaG, "g"]
+  ];
+  document.getElementById("barras-macros").innerHTML = barras.map(([nombre, actual, meta, unidad]) => crearBarraMacro(nombre, actual, meta, unidad)).join("");
+
+  const btnCreatina = document.getElementById("btn-creatina");
+  const tomada = datos.creatinaG >= objetivos.creatinaG;
+  btnCreatina.classList.toggle("tomado", tomada);
+  btnCreatina.textContent = tomada
+    ? `✓ Creatina tomada (${redondear(datos.creatinaG)} g${datos.creatinaHora ? ` · ${datos.creatinaHora}` : ""})`
+    : `Marcar ${objetivos.creatinaG} g tomados`;
+  renderizarListaComidas(datos.comidas);
+}
+
+function crearBarraMacro(nombre, actual, meta, unidad) {
+  const porcentajeReal = meta > 0 ? actual / meta * 100 : 0;
+  const porcentajeVisual = Math.min(100, porcentajeReal);
+  const clase = porcentajeReal > 110 ? "exceso" : porcentajeReal >= 100 ? "completo" : "";
+  return `<div class="macro-fila">
+    <div class="macro-cabecera"><span>${nombre}</span><span>${redondear(actual)} de ${redondear(meta)} ${unidad}</span></div>
+    <div class="barra-fondo"><div class="barra-progreso ${clase}" style="width:${porcentajeVisual}%"></div></div>
+  </div>`;
+}
+
+function redondear(numero) {
+  return Math.round((Number(numero) || 0) * 10) / 10;
+}
+
+function agregarAgua(cantidad) {
+  const datos = obtenerNutricionDelDia();
+  datos.aguaMl = Math.max(0, (Number(datos.aguaMl) || 0) + Number(cantidad));
+  guardarNutricionDelDia(datos);
+  renderizarNutricion();
+}
+
+function alternarCreatina() {
+  const datos = obtenerNutricionDelDia();
+  const objetivo = obtenerObjetivosNutricion().creatinaG;
+  const yaTomada = datos.creatinaG >= objetivo;
+  datos.creatinaG = yaTomada ? 0 : objetivo;
+  datos.creatinaHora = yaTomada ? null : horaActual();
+  guardarNutricionDelDia(datos);
+  renderizarNutricion();
+}
+
+function agregarBigM() {
+  const scoops = Number(document.getElementById("bigm-scoops").value);
+  if (scoops <= 0) return alert("Ingresa una cantidad válida de scoops.");
+  const datos = obtenerNutricionDelDia();
+  datos.comidas.push({
+    id: generarId(), tipo: "Snack", nombre: "BIG M", cantidad: scoops, unidad: "scoop",
+    kcal: redondear(403 / 3 * scoops), proteina: redondear(34 / 3 * scoops),
+    carbohidratos: redondear(20 * scoops), grasas: 0,
+    hora: horaActual(), comentario: "Registro rápido según la etiqueta disponible"
+  });
+  guardarNutricionDelDia(datos);
+  renderizarNutricion();
+}
+
+function generarId() {
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function horaActual() {
+  return new Date().toTimeString().slice(0, 5);
+}
+
+function mostrarFormularioComida(indice = null) {
+  indiceComidaEditando = indice;
+  const form = document.getElementById("form-comida");
+  form.hidden = false;
+  document.getElementById("titulo-form-comida").textContent = indice === null ? "Registrar comida" : "Editar comida";
+  document.getElementById("btn-guardar-comida").textContent = indice === null ? "Guardar comida" : "Guardar cambios";
+  limpiarFormularioComida();
+  if (indice !== null) cargarComidaEnFormulario(obtenerNutricionDelDia().comidas[indice]);
+  form.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function limpiarFormularioComida() {
+  document.getElementById("comida-tipo").value = "Desayuno";
+  ["comida-nombre", "comida-cantidad", "comida-kcal", "comida-proteina", "comida-carbohidratos", "comida-grasas", "comida-comentario"].forEach((id) => document.getElementById(id).value = "");
+  document.getElementById("comida-unidad").value = "gramos";
+  document.getElementById("comida-hora").value = horaActual();
+}
+
+function cargarComidaEnFormulario(comida) {
+  if (!comida) return;
+  document.getElementById("comida-tipo").value = comida.tipo;
+  document.getElementById("comida-nombre").value = comida.nombre;
+  document.getElementById("comida-cantidad").value = comida.cantidad;
+  document.getElementById("comida-unidad").value = comida.unidad;
+  document.getElementById("comida-kcal").value = comida.kcal;
+  document.getElementById("comida-proteina").value = comida.proteina;
+  document.getElementById("comida-carbohidratos").value = comida.carbohidratos;
+  document.getElementById("comida-grasas").value = comida.grasas;
+  document.getElementById("comida-hora").value = comida.hora;
+  document.getElementById("comida-comentario").value = comida.comentario || "";
+}
+
+function cerrarFormularioComida() {
+  indiceComidaEditando = null;
+  document.getElementById("form-comida").hidden = true;
+}
+
+function guardarComida() {
+  const comida = {
+    id: indiceComidaEditando === null ? generarId() : obtenerNutricionDelDia().comidas[indiceComidaEditando]?.id || generarId(),
+    tipo: document.getElementById("comida-tipo").value,
+    nombre: document.getElementById("comida-nombre").value.trim(),
+    cantidad: Number(document.getElementById("comida-cantidad").value),
+    unidad: document.getElementById("comida-unidad").value,
+    kcal: Number(document.getElementById("comida-kcal").value),
+    proteina: Number(document.getElementById("comida-proteina").value),
+    carbohidratos: Number(document.getElementById("comida-carbohidratos").value),
+    grasas: Number(document.getElementById("comida-grasas").value),
+    hora: document.getElementById("comida-hora").value || horaActual(),
+    comentario: document.getElementById("comida-comentario").value.trim()
+  };
+  if (!comida.nombre || comida.cantidad <= 0) return alert("Ingresa el alimento y una cantidad válida.");
+  if ([comida.kcal, comida.proteina, comida.carbohidratos, comida.grasas].some((valor) => valor < 0 || !Number.isFinite(valor))) return alert("Completa los valores nutricionales con números válidos.");
+  const datos = obtenerNutricionDelDia();
+  if (indiceComidaEditando === null) datos.comidas.push(comida);
+  else datos.comidas[indiceComidaEditando] = comida;
+  guardarNutricionDelDia(datos);
+  cerrarFormularioComida();
+  renderizarNutricion();
+}
+
+function renderizarListaComidas(comidas) {
+  const contenedor = document.getElementById("lista-comidas-dia");
+  const grupos = ["Desayuno", "Almuerzo", "Cena", "Snack"];
+  const contenido = grupos.map((grupo) => {
+    const elementos = comidas.map((comida, indice) => ({ comida, indice })).filter(({ comida }) => comida.tipo === grupo);
+    if (!elementos.length) return "";
+    return `<section class="grupo-comidas"><h2>${grupo}</h2>${elementos.map(({ comida, indice }) => `
+      <article class="card comida-card">
+        <div class="comida-cabecera"><h3>${escaparHTML(comida.nombre)}</h3><span class="comida-hora">${escaparHTML(comida.hora)}</span></div>
+        <p class="comida-cantidad">${redondear(comida.cantidad)} ${escaparHTML(comida.unidad)}</p>
+        <p class="comida-macros">${redondear(comida.kcal)} kcal · P ${redondear(comida.proteina)} g · C ${redondear(comida.carbohidratos)} g · G ${redondear(comida.grasas)} g</p>
+        ${comida.comentario ? `<p class="historial-comentario">${escaparHTML(comida.comentario)}</p>` : ""}
+        <div class="acciones-comida"><button class="btn-serie-accion" data-editar-comida="${indice}">Editar</button><button class="btn-serie-accion btn-serie-eliminar" data-eliminar-comida="${indice}">Eliminar</button></div>
+      </article>`).join("")}</section>`;
+  }).join("");
+  contenedor.innerHTML = contenido || '<p class="historial-vacio">Todavía no registras comidas en este día.</p>';
+}
+
+function eliminarComida(indice) {
+  const datos = obtenerNutricionDelDia();
+  const comida = datos.comidas[indice];
+  if (!comida || !confirm(`¿Eliminar “${comida.nombre}” de este día?`)) return;
+  datos.comidas.splice(indice, 1);
+  guardarNutricionDelDia(datos);
+  renderizarNutricion();
+}
+
+function abrirFormularioObjetivos() {
+  const objetivos = obtenerObjetivosNutricion();
+  document.getElementById("objetivo-kcal").value = objetivos.kcal;
+  document.getElementById("objetivo-proteina").value = objetivos.proteina;
+  document.getElementById("objetivo-carbohidratos").value = objetivos.carbohidratos;
+  document.getElementById("objetivo-grasas").value = objetivos.grasas;
+  document.getElementById("objetivo-agua").value = objetivos.aguaMl;
+  document.getElementById("objetivo-creatina").value = objetivos.creatinaG;
+  document.getElementById("form-objetivos").hidden = false;
+}
+
+function guardarObjetivosNutricion() {
+  const objetivos = {
+    kcal: Number(document.getElementById("objetivo-kcal").value),
+    proteina: Number(document.getElementById("objetivo-proteina").value),
+    carbohidratos: Number(document.getElementById("objetivo-carbohidratos").value),
+    grasas: Number(document.getElementById("objetivo-grasas").value),
+    aguaMl: Number(document.getElementById("objetivo-agua").value),
+    creatinaG: Number(document.getElementById("objetivo-creatina").value)
+  };
+  if (Object.values(objetivos).some((valor) => !Number.isFinite(valor) || valor <= 0)) return alert("Todos los objetivos deben ser mayores que cero.");
+  localStorage.setItem("objetivosNutricion", JSON.stringify(objetivos));
+  document.getElementById("form-objetivos").hidden = true;
+  renderizarNutricion();
+}
+
 function mostrarHoy() {
   if (temporizadorBoxeo) pausarOReanudarBoxeo();
   document.querySelectorAll("main.app").forEach((pantalla) => pantalla.hidden = true);
@@ -1390,8 +1649,36 @@ function inicializarEventosEntrenamiento() {
   });
   document.getElementById("btn-volver-lista-historial").addEventListener("click", volverAListaHistorial);
   document.getElementById("btn-eliminar-entrenamiento").addEventListener("click", eliminarEntrenamientoGuardado);
-  document.getElementById("nav-nutricion").addEventListener("click", () => alert("Nutrición llegará en la Etapa 2."));
+  document.getElementById("nav-nutricion").addEventListener("click", mostrarNutricion);
   document.getElementById("nav-progreso").addEventListener("click", () => alert("Progreso llegará en la Etapa 3."));
+  document.getElementById("fecha-nutricion").addEventListener("change", () => {
+    cerrarFormularioComida();
+    renderizarNutricion();
+  });
+  document.querySelector(".botones-rapidos").addEventListener("click", (evento) => {
+    const boton = evento.target.closest("[data-agua]");
+    if (boton) agregarAgua(Number(boton.dataset.agua));
+  });
+  document.getElementById("btn-agua-personalizada").addEventListener("click", () => {
+    const cantidad = Number(document.getElementById("agua-personalizada").value);
+    if (cantidad <= 0) return alert("Ingresa una cantidad válida de agua.");
+    agregarAgua(cantidad);
+    document.getElementById("agua-personalizada").value = "";
+  });
+  document.getElementById("btn-creatina").addEventListener("click", alternarCreatina);
+  document.getElementById("btn-agregar-bigm").addEventListener("click", agregarBigM);
+  document.getElementById("btn-mostrar-form-comida").addEventListener("click", () => mostrarFormularioComida());
+  document.getElementById("btn-guardar-comida").addEventListener("click", guardarComida);
+  document.getElementById("btn-cancelar-comida").addEventListener("click", cerrarFormularioComida);
+  document.getElementById("lista-comidas-dia").addEventListener("click", (evento) => {
+    const editar = evento.target.closest("[data-editar-comida]");
+    const eliminar = evento.target.closest("[data-eliminar-comida]");
+    if (editar) mostrarFormularioComida(Number(editar.dataset.editarComida));
+    if (eliminar) eliminarComida(Number(eliminar.dataset.eliminarComida));
+  });
+  document.getElementById("btn-editar-objetivos").addEventListener("click", abrirFormularioObjetivos);
+  document.getElementById("btn-guardar-objetivos").addEventListener("click", guardarObjetivosNutricion);
+  document.getElementById("btn-cancelar-objetivos").addEventListener("click", () => document.getElementById("form-objetivos").hidden = true);
   document.getElementById("btn-iniciar-boxeo").addEventListener("click", iniciarTemporizadorBoxeo);
   document.getElementById("btn-pausar-boxeo").addEventListener("click", pausarOReanudarBoxeo);
   document.getElementById("btn-saltar-boxeo").addEventListener("click", () => completarSegmentoBoxeo(true));
