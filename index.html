@@ -17,7 +17,6 @@
 </head>
 <body>
   <main class="app" id="pantalla-hoy">
-    <!-- Formulario de fecha de inicio (solo se muestra la primera vez) -->
     <section class="card" id="config-inicial" hidden>
       <h2>Antes de empezar</h2>
       <p>¿Qué día arrancaste (o arrancas) tu programa? Esto solo lo pregunto una vez, sirve para calcular en qué semana vas.</p>
@@ -25,7 +24,6 @@
       <button class="btn-primario" id="btn-guardar-fecha">Guardar</button>
     </section>
 
-    <!-- Contenido normal del día -->
     <div id="contenido-hoy" hidden>
       <header class="app-header">
         <h1 id="fecha">Cargando fecha...</h1>
@@ -44,6 +42,55 @@
       <button class="btn-primario btn-grande" id="btn-comenzar">
         Comenzar entrenamiento
       </button>
+    </div>
+  </main>
+
+  <!-- Pantalla de entrenamiento (Parte A: sin cronómetro todavía) -->
+  <main class="app" id="pantalla-entrenamiento" hidden>
+    <header class="app-header header-entrenamiento">
+      <button class="btn-texto" id="btn-salir-entrenamiento">← Salir</button>
+      <h1 id="nombre-rutina-entrenamiento">—</h1>
+    </header>
+
+    <section class="card ejercicio-actual-card">
+      <p class="progreso-ejercicio" id="progreso-ejercicio-global"></p>
+      <h2 id="nombre-ejercicio-actual">—</h2>
+      <p class="ejercicio-rango" id="rango-ejercicio-actual"></p>
+      <p class="ultima-sesion" id="ultima-sesion-info"></p>
+
+      <div class="serie-indicador" id="serie-indicador"></div>
+      <div class="lado-indicador" id="lado-indicador" hidden></div>
+
+      <div class="campos-serie" id="campos-serie-reps">
+        <label>Peso (kg)
+          <input type="number" id="input-peso" inputmode="decimal" step="0.5" />
+        </label>
+        <label>Repeticiones
+          <input type="number" id="input-reps" inputmode="numeric" />
+        </label>
+        <label>RIR / dificultad (opcional)
+          <input type="text" id="input-rir" placeholder="ej. 2 en reserva" />
+        </label>
+      </div>
+
+      <div class="campos-serie" id="campos-serie-tiempo" hidden>
+        <label>Segundos sostenidos
+          <input type="number" id="input-segundos" inputmode="numeric" />
+        </label>
+      </div>
+
+      <button class="btn-primario" id="btn-completar-serie">Completar serie</button>
+
+      <label class="observaciones-label">Observaciones
+        <textarea id="input-observaciones" placeholder="Técnica, dolor, cansancio..."></textarea>
+      </label>
+
+      <div class="series-registradas" id="series-registradas"></div>
+    </section>
+
+    <div class="nav-ejercicio">
+      <button class="btn-secundario" id="btn-ejercicio-anterior">← Anterior</button>
+      <button class="btn-primario" id="btn-siguiente-ejercicio">Siguiente →</button>
     </div>
   </main>
 

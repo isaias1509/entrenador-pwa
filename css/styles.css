@@ -107,3 +107,115 @@ body {
   width: 100%;
   font-size: 1rem;
 }
+
+.header-entrenamiento {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-texto {
+  background: none;
+  border: none;
+  color: #3b82f6;
+  font-size: 0.9rem;
+  padding: 0;
+}
+
+.ejercicio-actual-card { margin-top: 16px; }
+
+.progreso-ejercicio { color: #8a8a92; font-size: 0.8rem; margin-bottom: 4px; }
+
+.ejercicio-rango { color: #cfcfd6; font-size: 0.9rem; margin-bottom: 10px; }
+
+.ultima-sesion {
+  background: #1c1c24;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  color: #a0a0a8;
+  margin-bottom: 14px;
+}
+
+.serie-indicador {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #3b82f6;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.lado-indicador {
+  text-align: center;
+  color: #a68cff;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.campos-serie {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.campos-serie label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.82rem;
+  color: #8a8a92;
+  gap: 4px;
+}
+
+.campos-serie input {
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  font-size: 1rem;
+  background: #1c1c24;
+  color: white;
+}
+
+.observaciones-label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.82rem;
+  color: #8a8a92;
+  gap: 4px;
+  margin-top: 14px;
+}
+
+.observaciones-label textarea {
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  background: #1c1c24;
+  color: white;
+  font-size: 0.9rem;
+  min-height: 60px;
+  resize: vertical;
+}
+
+.series-registradas {
+  margin-top: 14px;
+  border-top: 1px solid #24242b;
+  padding-top: 10px;
+}
+
+.series-registradas p {
+  font-size: 0.85rem;
+  color: #cfcfd6;
+  padding: 4px 0;
+}
+
+.nav-ejercicio {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.nav-ejercicio .btn-secundario,
+.nav-ejercicio .btn-primario {
+  flex: 1;
+  margin-top: 0;
+}
