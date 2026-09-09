@@ -68,24 +68,47 @@ function renderizarPantallaHoy() {
   renderizarBoxeoOpcional(rutina, semana, diaSemana);
 
   const btnComenzar = document.getElementById("btn-comenzar");
+  const btnDescartar = document.getElementById("btn-descartar-sesion");
   const sesionPendiente = cargarSesionActiva();
+  actualizarEstadoDia(rutina, sesionPendiente);
   if (sesionPendiente) {
     btnComenzar.textContent = `Continuar: ${sesionPendiente.rutina.nombre}`;
     btnComenzar.disabled = false;
     btnComenzar.onclick = reanudarEntrenamiento;
+    btnDescartar.hidden = false;
     return;
   }
+  btnDescartar.hidden = true;
   if (rutina.tipo === "descanso") {
     btnComenzar.textContent = "Hoy es tu día de descanso 💤";
     btnComenzar.disabled = true;
   } else if (rutina.tipo === "pesas") {
-    btnComenzar.textContent = "Comenzar entrenamiento";
+    btnComenzar.textContent = entrenamientoCompletadoHoy(rutina.nombre) ? "Entrenar nuevamente" : "Comenzar entrenamiento";
     btnComenzar.disabled = false;
     btnComenzar.onclick = () => iniciarEntrenamiento(rutina);
   } else {
-    btnComenzar.textContent = "Comenzar entrenamiento";
+    btnComenzar.textContent = entrenamientoCompletadoHoy(rutina.nombre) ? "Entrenar nuevamente" : "Comenzar entrenamiento";
     btnComenzar.disabled = false;
     btnComenzar.onclick = () => iniciarBoxeo(rutina);
+  }
+}
+
+function entrenamientoCompletadoHoy(nombreRutina) {
+  return obtenerHistorial().some((item) => item.fecha === claveFechaLocal() && item.rutina.nombre === nombreRutina);
+}
+
+function actualizarEstadoDia(rutina, activa) {
+  const estado = document.getElementById("estado-dia");
+  estado.className = "estado-dia";
+  if (entrenamientoCompletadoHoy(rutina.nombre)) {
+    estado.textContent = "Completado";
+    estado.classList.add("completado");
+  } else if (activa) {
+    estado.textContent = "Iniciado";
+    estado.classList.add("iniciado");
+  } else {
+    estado.textContent = rutina.tipo === "descanso" ? "Descanso" : "Pendiente";
+    estado.classList.add(rutina.tipo === "descanso" ? "completado" : "pendiente");
   }
 }
 
@@ -208,6 +231,7 @@ function renderizarBoxeoOpcional(rutina, semanaActual, diaSemana) {
 // ============================================================
 
 let sesion = null;
+let indiceEdicionSerie = null;
 let temporizadorDescanso = null;
 let finDescansoMs = null;
 let segundosRestantes = 0;
@@ -216,6 +240,7 @@ let audioContexto = null;
 
 function iniciarEntrenamiento(rutina) {
   detenerDescanso(false);
+  indiceEdicionSerie = null;
   sesion = {
     rutina,
     tipoFlujo: "pesas",
@@ -259,6 +284,7 @@ function reanudarEntrenamiento() {
   const guardada = cargarSesionActiva();
   if (!guardada) return renderizarPantallaHoy();
   sesion = guardada;
+  indiceEdicionSerie = null;
   if (sesion.tipoFlujo === "boxeo") {
     mostrarPantallaBoxeo();
     return;
@@ -324,6 +350,8 @@ function renderizarEjercicioActual() {
   document.getElementById("input-rir").value = "";
   document.getElementById("input-segundos").value = "";
   document.getElementById("input-observaciones").value = registro.observaciones || "";
+  document.getElementById("btn-completar-serie").textContent = indiceEdicionSerie === null ? "Completar serie" : "Guardar cambios";
+  document.getElementById("btn-cancelar-edicion").hidden = indiceEdicionSerie === null;
 
   const ultimaSerieConPeso = [...registro.series].reverse().find((serie) => Number.isFinite(serie.peso));
   if (ultimaSerieConPeso && !esTiempo) {
@@ -334,6 +362,7 @@ function renderizarEjercicioActual() {
 
   actualizarIndicadorSerieYLado(ej, registro);
   renderizarSeriesRegistradas(ej, registro);
+  actualizarMensajeProgresion(ej, registro);
   actualizarBotonesNavegacion();
 }
 
@@ -372,12 +401,21 @@ function renderizarSeriesRegistradas(ej, registro) {
     return;
   }
   contenedor.innerHTML = registro.series
-    .map((s) => {
+    .map((s, indice) => {
       const ladoTxt = s.lado ? ` (${s.lado === "derecha" ? "Der" : "Izq"})` : "";
+      let descripcion;
       if (ej.tipoSerie === "tiempo") {
-        return `<p>Serie ${s.numeroSerie}${ladoTxt}: ${s.segundos} seg</p>`;
+        descripcion = `Serie ${s.numeroSerie}${ladoTxt}: ${s.segundos} seg`;
+      } else {
+        descripcion = `Serie ${s.numeroSerie}${ladoTxt}: ${s.peso}kg × ${s.reps} reps${s.rir ? ` (${s.rir})` : ""}`;
       }
-      return `<p>Serie ${s.numeroSerie}${ladoTxt}: ${s.peso}kg × ${s.reps} reps${s.rir ? ` (${s.rir})` : ""}</p>`;
+      return `<div class="serie-fila">
+        <p>${descripcion}</p>
+        <div class="acciones-serie">
+          <button class="btn-serie-accion" data-accion="editar" data-indice="${indice}">Editar</button>
+          <button class="btn-serie-accion btn-serie-eliminar" data-accion="eliminar" data-indice="${indice}">Eliminar</button>
+        </div>
+      </div>`;
     })
     .join("");
 }
@@ -385,7 +423,12 @@ function renderizarSeriesRegistradas(ej, registro) {
 function completarSerie() {
   const ej = obtenerEjercicioActual();
   const registro = sesion.registros[ej.id];
-  const { numeroSerie, lado, esExtra } = calcularNumeroSerieYLado(ej, registro);
+  const editando = indiceEdicionSerie !== null;
+  const original = editando ? registro.series[indiceEdicionSerie] : null;
+  const calculada = calcularNumeroSerieYLado(ej, registro);
+  const numeroSerie = editando ? original.numeroSerie : calculada.numeroSerie;
+  const lado = editando ? original.lado : calculada.lado;
+  const esExtra = editando ? original.numeroSerie > ej.series : calculada.esExtra;
 
   if (numeroSerie > ej.series && !esExtra) {
     alert("Ya completaste todas las series de este ejercicio. Puedes pasar al siguiente.");
@@ -407,7 +450,12 @@ function completarSerie() {
     entrada.rir = document.getElementById("input-rir").value || null;
   }
 
-  registro.series.push(entrada);
+  if (editando) {
+    registro.series[indiceEdicionSerie] = entrada;
+    indiceEdicionSerie = null;
+  } else {
+    registro.series.push(entrada);
+  }
   if (esExtra) {
     registro.extraActiva = false;
     registro.extraCompletada = true;
@@ -420,7 +468,7 @@ function completarSerie() {
 
   renderizarEjercicioActual();
 
-  if (debeDescansar && descansoAutomatico) {
+  if (!editando && debeDescansar && descansoAutomatico) {
     iniciarDescanso(ej.descansoSeg);
   } else if (ej.unilateral && !debeDescansar) {
     document.getElementById("descanso-estado").textContent = "Completa el otro lado antes de descansar";
@@ -576,12 +624,133 @@ function actualizarBotonesNavegacion() {
 }
 
 function irEjercicioAnterior() {
+  if (indiceEdicionSerie !== null) {
+    alert("Guarda o cancela la edición de la serie antes de cambiar de ejercicio.");
+    return;
+  }
   if (sesion.indiceEjercicio > 0) {
     guardarObservacionesActuales();
     sesion.indiceEjercicio--;
     guardarSesionActiva();
     renderizarEjercicioActual();
   }
+}
+
+function editarSerie(indice) {
+  const ej = obtenerEjercicioActual();
+  const registro = sesion.registros[ej.id];
+  const serie = registro.series[indice];
+  if (!serie) return;
+  indiceEdicionSerie = indice;
+  if (ej.tipoSerie === "tiempo") {
+    document.getElementById("input-segundos").value = serie.segundos;
+  } else {
+    document.getElementById("input-peso").value = serie.peso;
+    document.getElementById("input-reps").value = serie.reps;
+    document.getElementById("input-rir").value = serie.rir || "";
+  }
+  document.getElementById("btn-completar-serie").textContent = "Guardar cambios";
+  document.getElementById("btn-cancelar-edicion").hidden = false;
+  document.getElementById("serie-indicador").textContent = `Editando serie ${serie.numeroSerie}${serie.lado ? ` · ${serie.lado}` : ""}`;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function cancelarEdicionSerie() {
+  indiceEdicionSerie = null;
+  renderizarEjercicioActual();
+}
+
+function eliminarSerie(indice) {
+  const ej = obtenerEjercicioActual();
+  const registro = sesion.registros[ej.id];
+  const eliminada = registro.series[indice];
+  if (!eliminada) return;
+  const quitaraExtra = Boolean(ej.serieExtraOpcional) && eliminada.numeroSerie <= ej.series && registro.series.some((serie) => serie.numeroSerie > ej.series);
+  const aviso = quitaraExtra
+    ? "¿Eliminar esta serie? Para mantener el orden también se quitará la serie extra; podrás registrarla nuevamente."
+    : "¿Eliminar esta serie registrada?";
+  if (!confirm(aviso)) return;
+  registro.series.splice(indice, 1);
+  if (ej.serieExtraOpcional && (quitaraExtra || eliminada.numeroSerie > ej.series)) {
+    registro.series = registro.series.filter((serie) => serie.numeroSerie <= ej.series);
+    registro.extraActiva = false;
+    registro.extraCompletada = false;
+  }
+  indiceEdicionSerie = null;
+  renumerarSeries(ej, registro);
+  guardarSesionActiva();
+  renderizarEjercicioActual();
+}
+
+function renumerarSeries(ej, registro) {
+  if (!ej.unilateral) {
+    registro.series.forEach((serie, indice) => serie.numeroSerie = indice + 1);
+    return;
+  }
+  const ordenLados = ej.comenzarPor === "izquierda" ? ["izquierda", "derecha"] : ["derecha", "izquierda"];
+  registro.series.forEach((serie, indice) => {
+    if (indice < ej.series * 2) {
+      serie.numeroSerie = Math.floor(indice / 2) + 1;
+      serie.lado = ordenLados[indice % 2];
+    }
+  });
+}
+
+function obtenerEntradasHistoricas(ejercicioId) {
+  const todas = [];
+  obtenerHistorial().forEach((item) => todas.push(...(item.registros?.[ejercicioId]?.series || [])));
+  return todas;
+}
+
+function actualizarMensajeProgresion(ej, registro) {
+  const mensaje = document.getElementById("mensaje-progresion");
+  const textos = [];
+  if (ej.tipoSerie !== "tiempo" && registro.series.length) {
+    const objetivo = ej.series * (ej.unilateral ? 2 : 1);
+    const efectivas = registro.series.slice(0, objetivo);
+    if (efectivas.length >= objetivo && efectivas.every((serie) => serie.reps >= ej.repsMax)) {
+      textos.push("Completaste el máximo del rango en todas las series; considera aumentar ligeramente el peso la próxima vez.");
+    }
+    const historicas = obtenerEntradasHistoricas(ej.id);
+    const maxHistorico = historicas.reduce((max, serie) => Math.max(max, serie.peso || 0), 0);
+    const maxActual = registro.series.reduce((max, serie) => Math.max(max, serie.peso || 0), 0);
+    if (maxActual > maxHistorico && maxHistorico > 0) textos.push(`Nuevo récord de peso: ${maxActual} kg.`);
+    const ultimaSesion = obtenerUltimasSeriesDelEjercicio(ej.id);
+    if (ultimaSesion.length && registro.series.length >= objetivo) {
+      const repsActuales = efectivas.reduce((total, serie) => total + (serie.reps || 0), 0);
+      const repsAnteriores = ultimaSesion.slice(0, objetivo).reduce((total, serie) => total + (serie.reps || 0), 0);
+      const diferencia = repsActuales - repsAnteriores;
+      if (diferencia > 0) textos.push(`Mejoraste ${diferencia} repeticiones totales frente a la última sesión.`);
+      if (diferencia < 0) textos.push(`Hiciste ${Math.abs(diferencia)} repeticiones totales menos que en la última sesión.`);
+
+      const dosAnteriores = obtenerSesionesAnterioresDelEjercicio(ej.id).slice(-2);
+      if (dosAnteriores.length === 2) {
+        const volumenActual = efectivas.reduce((total, serie) => total + (serie.peso || 0) * (serie.reps || 0), 0);
+        const volumenPrevio = dosAnteriores[1].reduce((total, serie) => total + (serie.peso || 0) * (serie.reps || 0), 0);
+        const volumenAnteprevio = dosAnteriores[0].reduce((total, serie) => total + (serie.peso || 0) * (serie.reps || 0), 0);
+        if (volumenActual < volumenPrevio && volumenPrevio < volumenAnteprevio) {
+          textos.push("Tu rendimiento bajó durante dos sesiones; revisa descanso, alimentación y técnica.");
+        }
+      }
+    }
+  }
+  mensaje.hidden = textos.length === 0;
+  mensaje.textContent = textos.join(" ");
+}
+
+function obtenerUltimasSeriesDelEjercicio(ejercicioId) {
+  const historial = obtenerHistorial();
+  for (let i = historial.length - 1; i >= 0; i--) {
+    const series = historial[i].registros?.[ejercicioId]?.series || [];
+    if (series.length) return series;
+  }
+  return [];
+}
+
+function obtenerSesionesAnterioresDelEjercicio(ejercicioId) {
+  return obtenerHistorial()
+    .map((item) => item.registros?.[ejercicioId]?.series || [])
+    .filter((series) => series.length > 0);
 }
 
 function activarSerieExtra() {
@@ -602,6 +771,17 @@ function omitirEjercicioOpcional() {
 }
 
 function irSiguienteEjercicioOFinalizar() {
+  if (indiceEdicionSerie !== null) {
+    alert("Guarda o cancela la edición de la serie antes de avanzar.");
+    return;
+  }
+  const ejActual = obtenerEjercicioActual();
+  const registroActual = sesion.registros[ejActual.id];
+  const objetivo = ejActual.series * (ejActual.unilateral ? 2 : 1);
+  const incompleto = !registroActual.omitido && registroActual.series.length < objetivo;
+  if (incompleto && !confirm(`Aún llevas ${registroActual.series.length} de ${objetivo} registros en ${ejActual.nombre}. ¿Avanzar de todas formas?`)) {
+    return;
+  }
   const esUltimo = sesion.indiceEjercicio === sesion.rutina.ejercicios.length - 1;
   if (esUltimo) {
     guardarObservacionesActuales();
@@ -862,6 +1042,22 @@ function obtenerSesionAnterior(nombreRutina) {
   return obtenerHistorial().filter((item) => item.rutina.nombre === nombreRutina).at(-1) || null;
 }
 
+function obtenerRecordsDeSesion(sesionActual) {
+  if (sesionActual.rutina.tipo === "boxeo") return [];
+  const records = [];
+  (sesionActual.rutina.ejercicios || []).forEach((ej) => {
+    if (ej.tipoSerie === "tiempo") return;
+    const actuales = sesionActual.registros[ej.id]?.series || [];
+    if (!actuales.length) return;
+    const historicas = obtenerEntradasHistoricas(ej.id);
+    if (!historicas.length) return;
+    const maxActual = Math.max(...actuales.map((serie) => serie.peso || 0));
+    const maxHistorico = Math.max(...historicas.map((serie) => serie.peso || 0));
+    if (maxActual > maxHistorico) records.push(`${ej.nombre}: nuevo máximo de ${maxActual} kg`);
+  });
+  return records;
+}
+
 function mostrarResumenFinal() {
   detenerDescanso(false);
   detenerTemporizadorBoxeo();
@@ -899,6 +1095,10 @@ function mostrarResumenFinal() {
     else comparacion = "Tu volumen fue igual al de la sesión anterior.";
   }
   document.getElementById("comparacion-resumen").textContent = comparacion;
+  const records = obtenerRecordsDeSesion(sesion);
+  const bloqueRecords = document.getElementById("records-resumen");
+  bloqueRecords.hidden = records.length === 0;
+  bloqueRecords.innerHTML = records.length ? `<strong>🏆 Nuevos récords</strong><br>${records.join("<br>")}` : "";
 }
 
 function guardarEntrenamientoFinal() {
@@ -1004,6 +1204,17 @@ function salirCardio() {
   renderizarPantallaHoy();
 }
 
+function descartarSesionActiva() {
+  const activa = cargarSesionActiva();
+  if (!activa) return;
+  if (!confirm(`¿Descartar definitivamente la sesión “${activa.rutina.nombre}”? Sus registros incompletos se perderán.`)) return;
+  detenerDescanso(false);
+  detenerTemporizadorBoxeo();
+  localStorage.removeItem("sesionEntrenamientoActiva");
+  sesion = null;
+  renderizarPantallaHoy();
+}
+
 function inicializarEventosEntrenamiento() {
   document.getElementById("btn-completar-serie").addEventListener("click", completarSerie);
   document.getElementById("btn-siguiente-ejercicio").addEventListener("click", irSiguienteEjercicioOFinalizar);
@@ -1015,6 +1226,15 @@ function inicializarEventosEntrenamiento() {
   document.getElementById("btn-restar-15").addEventListener("click", () => ajustarDescanso(-15));
   document.getElementById("btn-serie-extra").addEventListener("click", activarSerieExtra);
   document.getElementById("btn-omitir-ejercicio").addEventListener("click", omitirEjercicioOpcional);
+  document.getElementById("btn-cancelar-edicion").addEventListener("click", cancelarEdicionSerie);
+  document.getElementById("series-registradas").addEventListener("click", (evento) => {
+    const boton = evento.target.closest("[data-accion]");
+    if (!boton) return;
+    const indice = Number(boton.dataset.indice);
+    if (boton.dataset.accion === "editar") editarSerie(indice);
+    if (boton.dataset.accion === "eliminar") eliminarSerie(indice);
+  });
+  document.getElementById("btn-descartar-sesion").addEventListener("click", descartarSesionActiva);
   document.getElementById("check-descanso-automatico").addEventListener("change", (evento) => {
     localStorage.setItem("descansoAutomatico", String(evento.target.checked));
   });

@@ -28,6 +28,7 @@
       <header class="app-header">
         <h1 id="fecha">Cargando fecha...</h1>
         <p class="semana-actual" id="semana-actual"></p>
+        <span class="estado-dia pendiente" id="estado-dia">Pendiente</span>
       </header>
 
       <section class="card rutina-card">
@@ -42,6 +43,7 @@
       <button class="btn-primario btn-grande" id="btn-comenzar">
         Comenzar entrenamiento
       </button>
+      <button class="btn-peligro btn-ancho" id="btn-descartar-sesion" hidden>Descartar sesión pendiente</button>
     </div>
 
   </main>
@@ -81,8 +83,11 @@
       </div>
 
       <button class="btn-primario" id="btn-completar-serie">Completar serie</button>
+      <button class="btn-secundario btn-ancho" id="btn-cancelar-edicion" hidden>Cancelar edición</button>
       <button class="btn-secundario btn-ancho" id="btn-serie-extra" hidden>Añadir serie extra izquierda</button>
       <button class="btn-secundario btn-ancho btn-omitir" id="btn-omitir-ejercicio" hidden>Omitir ejercicio opcional</button>
+
+      <p class="mensaje-progresion" id="mensaje-progresion" hidden></p>
 
       <section class="descanso-card" id="descanso-card">
         <div class="descanso-encabezado">
@@ -183,6 +188,7 @@
       </div>
       <p class="resumen-volumen" id="resumen-volumen"></p>
       <p class="comparacion-resumen" id="comparacion-resumen"></p>
+      <div class="records-resumen" id="records-resumen" hidden></div>
 
       <label class="observaciones-label">¿Cómo te sentiste?
         <textarea id="input-sensaciones" placeholder="Energía, fuerza, molestias, comentario general..."></textarea>

@@ -327,3 +327,65 @@ body {
 .controles-guiados { display: flex; gap: 10px; margin-top: 10px; }
 .controles-guiados button { flex: 1; min-height: 46px; }
 .round-descanso { color: #22c55e !important; }
+
+.estado-dia {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.estado-dia.pendiente { background: #302814; color: #fbbf24; }
+.estado-dia.iniciado { background: #10294a; color: #60a5fa; }
+.estado-dia.completado { background: #10321f; color: #4ade80; }
+
+.btn-peligro {
+  background: transparent;
+  border: 1px solid #7f1d1d;
+  color: #fca5a5;
+  border-radius: 10px;
+  padding: 11px 14px;
+  margin-top: 10px;
+}
+
+.serie-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid #24242b;
+  padding: 7px 0;
+}
+.serie-fila:last-child { border-bottom: none; }
+.serie-fila p { flex: 1; margin: 0; }
+.acciones-serie { display: flex; gap: 5px; }
+.btn-serie-accion {
+  background: #23232c;
+  color: #bfc0c8;
+  border: none;
+  border-radius: 7px;
+  padding: 7px 9px;
+  font-size: 0.75rem;
+}
+.btn-serie-eliminar { color: #fca5a5; }
+
+.mensaje-progresion {
+  background: #261d3b;
+  border: 1px solid #6d4aad;
+  color: #d8c5ff !important;
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 12px;
+  font-size: 0.85rem;
+}
+
+.records-resumen {
+  background: #302814;
+  border: 1px solid #806515;
+  color: #fde68a;
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 10px;
+  font-size: 0.85rem;
+}
