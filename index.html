@@ -25,6 +25,20 @@
     </section>
 
     <div id="contenido-hoy" hidden>
+      <section class="modo-prueba">
+        <label for="selector-dia-prueba">🧪 Ver rutina de:</label>
+        <select id="selector-dia-prueba">
+          <option value="actual">Hoy (día real)</option>
+          <option value="1">Lunes</option>
+          <option value="2">Martes</option>
+          <option value="3">Miércoles</option>
+          <option value="4">Jueves</option>
+          <option value="5">Viernes</option>
+          <option value="6">Sábado</option>
+          <option value="0">Domingo</option>
+        </select>
+      </section>
+
       <header class="app-header">
         <h1 id="fecha">Cargando fecha...</h1>
         <p class="semana-actual" id="semana-actual"></p>
@@ -43,9 +57,10 @@
         Comenzar entrenamiento
       </button>
     </div>
+
   </main>
 
-  <!-- Pantalla de entrenamiento (Parte A: sin cronómetro todavía) -->
+  <!-- Pantalla de entrenamiento -->
   <main class="app" id="pantalla-entrenamiento" hidden>
     <header class="app-header header-entrenamiento">
       <button class="btn-texto" id="btn-salir-entrenamiento">← Salir</button>
@@ -80,6 +95,32 @@
       </div>
 
       <button class="btn-primario" id="btn-completar-serie">Completar serie</button>
+
+      <section class="descanso-card" id="descanso-card">
+        <div class="descanso-encabezado">
+          <div>
+            <p class="descanso-etiqueta">Descanso</p>
+            <p class="descanso-estado" id="descanso-estado">Listo para iniciar</p>
+          </div>
+          <label class="switch-descanso">
+            <input type="checkbox" id="check-descanso-automatico" checked />
+            <span>Automático</span>
+          </label>
+        </div>
+
+        <div class="cronometro" id="cronometro-descanso">00:00</div>
+
+        <div class="controles-tiempo">
+          <button class="btn-tiempo" id="btn-restar-15">−15 s</button>
+          <button class="btn-primario btn-descanso" id="btn-iniciar-descanso">Iniciar descanso</button>
+          <button class="btn-tiempo" id="btn-sumar-15">+15 s</button>
+        </div>
+
+        <div class="controles-secundarios-descanso">
+          <button class="btn-texto" id="btn-pausar-descanso" disabled>Pausar</button>
+          <button class="btn-texto btn-saltar" id="btn-saltar-descanso" disabled>Saltar descanso</button>
+        </div>
+      </section>
 
       <label class="observaciones-label">Observaciones
         <textarea id="input-observaciones" placeholder="Técnica, dolor, cansancio..."></textarea>

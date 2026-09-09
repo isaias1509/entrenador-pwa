@@ -1,9 +1,10 @@
-const CACHE_NAME = "mi-gym-app-v1";
+const CACHE_NAME = "mi-gym-app-v3";
 const ARCHIVOS_CACHE = [
   "./",
   "./index.html",
   "./css/styles.css",
   "./js/app.js",
+  "./js/rutinas.js",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png"

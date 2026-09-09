@@ -43,10 +43,15 @@ function inicializarConfiguracion() {
 // ---------- Render de la pantalla "Hoy" ----------
 function renderizarPantallaHoy() {
   const hoy = new Date();
-  const diaSemana = hoy.getDay();
+  const selectorDia = document.getElementById("selector-dia-prueba");
+  const diaSeleccionado = selectorDia ? selectorDia.value : "actual";
+  const esVistaPrueba = diaSeleccionado !== "actual";
+  const diaSemana = esVistaPrueba ? Number(diaSeleccionado) : hoy.getDay();
   const rutina = RUTINAS[diaSemana];
 
-  document.getElementById("fecha").textContent = formatearFechaLarga(hoy);
+  document.getElementById("fecha").textContent = esVistaPrueba
+    ? `Vista de prueba: ${["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"][diaSemana]}`
+    : formatearFechaLarga(hoy);
 
   const fechaInicio = localStorage.getItem("fechaInicioPrograma");
   const semana = calcularSemanaActual(fechaInicio);
@@ -184,12 +189,18 @@ function renderizarBoxeoOpcional(rutina, semanaActual, diaSemana) {
 }
 
 // ============================================================
-// FLUJO DE ENTRENAMIENTO (Parte A: sin cronómetro todavía)
+// FLUJO DE ENTRENAMIENTO
 // ============================================================
 
 let sesion = null;
+let temporizadorDescanso = null;
+let finDescansoMs = null;
+let segundosRestantes = 0;
+let descansoPausado = false;
+let audioContexto = null;
 
 function iniciarEntrenamiento(rutina) {
+  detenerDescanso(false);
   sesion = {
     rutina,
     indiceEjercicio: 0,
@@ -202,6 +213,9 @@ function iniciarEntrenamiento(rutina) {
   document.getElementById("pantalla-hoy").hidden = true;
   document.getElementById("pantalla-entrenamiento").hidden = false;
   document.getElementById("nombre-rutina-entrenamiento").textContent = rutina.nombre;
+
+  const automaticoGuardado = localStorage.getItem("descansoAutomatico");
+  document.getElementById("check-descanso-automatico").checked = automaticoGuardado !== "false";
 
   renderizarEjercicioActual();
 }
@@ -252,6 +266,13 @@ function renderizarEjercicioActual() {
   document.getElementById("input-rir").value = "";
   document.getElementById("input-segundos").value = "";
   document.getElementById("input-observaciones").value = registro.observaciones || "";
+
+  const ultimaSerieConPeso = [...registro.series].reverse().find((serie) => Number.isFinite(serie.peso));
+  if (ultimaSerieConPeso && !esTiempo) {
+    document.getElementById("input-peso").value = ultimaSerieConPeso.peso;
+  }
+
+  prepararDescansoDelEjercicio(ej);
 
   actualizarIndicadorSerieYLado(ej, registro);
   renderizarSeriesRegistradas(ej, registro);
@@ -323,7 +344,154 @@ function completarSerie() {
   registro.series.push(entrada);
   registro.observaciones = document.getElementById("input-observaciones").value;
 
+  const debeDescansar = !ej.unilateral || lado === "izquierda" && ej.comenzarPor !== "izquierda" || lado === "derecha" && ej.comenzarPor === "izquierda";
+  const descansoAutomatico = document.getElementById("check-descanso-automatico").checked;
+
   renderizarEjercicioActual();
+
+  if (debeDescansar && descansoAutomatico) {
+    iniciarDescanso(ej.descansoSeg);
+  } else if (ej.unilateral && !debeDescansar) {
+    document.getElementById("descanso-estado").textContent = "Completa el otro lado antes de descansar";
+  }
+}
+
+// ---------- Cronómetro de descanso ----------
+function prepararDescansoDelEjercicio(ej) {
+  if (temporizadorDescanso || descansoPausado) return;
+  segundosRestantes = ej.descansoSeg || 0;
+  actualizarVistaDescanso();
+  document.getElementById("descanso-estado").textContent = `Descanso recomendado: ${formatearTiempo(segundosRestantes)}`;
+}
+
+function formatearTiempo(totalSegundos) {
+  const total = Math.max(0, Math.ceil(totalSegundos));
+  const minutos = Math.floor(total / 60);
+  const segundos = total % 60;
+  return `${String(minutos).padStart(2, "0")}:${String(segundos).padStart(2, "0")}`;
+}
+
+function iniciarDescanso(segundos = null) {
+  if (!sesion) return;
+  activarAudio();
+
+  const ej = obtenerEjercicioActual();
+  if (segundos !== null) segundosRestantes = segundos;
+  if (segundosRestantes <= 0) segundosRestantes = ej.descansoSeg || 60;
+
+  if (temporizadorDescanso) clearInterval(temporizadorDescanso);
+  finDescansoMs = Date.now() + segundosRestantes * 1000;
+  descansoPausado = false;
+
+  document.getElementById("descanso-card").classList.remove("terminado");
+  document.getElementById("descanso-estado").textContent = "Descansando…";
+  document.getElementById("btn-iniciar-descanso").textContent = "Reiniciar";
+  document.getElementById("btn-pausar-descanso").textContent = "Pausar";
+  document.getElementById("btn-pausar-descanso").disabled = false;
+  document.getElementById("btn-saltar-descanso").disabled = false;
+
+  actualizarCuentaRegresiva();
+  temporizadorDescanso = setInterval(actualizarCuentaRegresiva, 250);
+}
+
+function actualizarCuentaRegresiva() {
+  if (!finDescansoMs) return;
+  segundosRestantes = Math.max(0, (finDescansoMs - Date.now()) / 1000);
+  actualizarVistaDescanso();
+  if (segundosRestantes <= 0) finalizarDescanso();
+}
+
+function actualizarVistaDescanso() {
+  document.getElementById("cronometro-descanso").textContent = formatearTiempo(segundosRestantes);
+}
+
+function pausarOReanudarDescanso() {
+  if (descansoPausado) {
+    iniciarDescanso();
+    return;
+  }
+  if (!temporizadorDescanso) return;
+
+  actualizarCuentaRegresiva();
+  clearInterval(temporizadorDescanso);
+  temporizadorDescanso = null;
+  finDescansoMs = null;
+  descansoPausado = true;
+  document.getElementById("descanso-estado").textContent = "Descanso pausado";
+  document.getElementById("btn-pausar-descanso").textContent = "Reanudar";
+}
+
+function ajustarDescanso(cambioSegundos) {
+  if (!sesion) return;
+  segundosRestantes = Math.max(0, Math.ceil(segundosRestantes) + cambioSegundos);
+
+  if (temporizadorDescanso) {
+    finDescansoMs = Date.now() + segundosRestantes * 1000;
+  }
+  actualizarVistaDescanso();
+
+  if (segundosRestantes === 0 && temporizadorDescanso) finalizarDescanso();
+}
+
+function detenerDescanso(restablecer = true) {
+  if (temporizadorDescanso) clearInterval(temporizadorDescanso);
+  temporizadorDescanso = null;
+  finDescansoMs = null;
+  descansoPausado = false;
+
+  if (restablecer && sesion) {
+    segundosRestantes = obtenerEjercicioActual().descansoSeg || 0;
+    actualizarVistaDescanso();
+    document.getElementById("descanso-estado").textContent = "Descanso omitido";
+    document.getElementById("btn-iniciar-descanso").textContent = "Iniciar descanso";
+    document.getElementById("btn-pausar-descanso").textContent = "Pausar";
+    document.getElementById("btn-pausar-descanso").disabled = true;
+    document.getElementById("btn-saltar-descanso").disabled = true;
+  }
+}
+
+function finalizarDescanso() {
+  if (temporizadorDescanso) clearInterval(temporizadorDescanso);
+  temporizadorDescanso = null;
+  finDescansoMs = null;
+  segundosRestantes = 0;
+  descansoPausado = false;
+  actualizarVistaDescanso();
+
+  document.getElementById("descanso-card").classList.add("terminado");
+  document.getElementById("descanso-estado").textContent = "¡Descanso terminado! Siguiente serie";
+  document.getElementById("btn-iniciar-descanso").textContent = "Iniciar de nuevo";
+  document.getElementById("btn-pausar-descanso").disabled = true;
+  document.getElementById("btn-saltar-descanso").disabled = true;
+
+  reproducirAviso();
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+}
+
+function activarAudio() {
+  if (audioContexto) {
+    if (audioContexto.state === "suspended") audioContexto.resume();
+    return;
+  }
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (AudioCtx) audioContexto = new AudioCtx();
+}
+
+function reproducirAviso() {
+  if (!audioContexto) return;
+  [0, 0.22, 0.44].forEach((retraso) => {
+    const oscilador = audioContexto.createOscillator();
+    const ganancia = audioContexto.createGain();
+    oscilador.type = "sine";
+    oscilador.frequency.value = 880;
+    ganancia.gain.setValueAtTime(0.001, audioContexto.currentTime + retraso);
+    ganancia.gain.exponentialRampToValueAtTime(0.25, audioContexto.currentTime + retraso + 0.01);
+    ganancia.gain.exponentialRampToValueAtTime(0.001, audioContexto.currentTime + retraso + 0.16);
+    oscilador.connect(ganancia);
+    ganancia.connect(audioContexto.destination);
+    oscilador.start(audioContexto.currentTime + retraso);
+    oscilador.stop(audioContexto.currentTime + retraso + 0.18);
+  });
 }
 
 function actualizarBotonesNavegacion() {
@@ -355,6 +523,7 @@ function irSiguienteEjercicioOFinalizar() {
 }
 
 function salirEntrenamiento() {
+  detenerDescanso(false);
   sesion = null;
   document.getElementById("pantalla-entrenamiento").hidden = true;
   document.getElementById("pantalla-hoy").hidden = false;
@@ -364,6 +533,15 @@ function inicializarEventosEntrenamiento() {
   document.getElementById("btn-completar-serie").addEventListener("click", completarSerie);
   document.getElementById("btn-siguiente-ejercicio").addEventListener("click", irSiguienteEjercicioOFinalizar);
   document.getElementById("btn-ejercicio-anterior").addEventListener("click", irEjercicioAnterior);
+  document.getElementById("btn-iniciar-descanso").addEventListener("click", () => iniciarDescanso(obtenerEjercicioActual().descansoSeg));
+  document.getElementById("btn-pausar-descanso").addEventListener("click", pausarOReanudarDescanso);
+  document.getElementById("btn-saltar-descanso").addEventListener("click", () => detenerDescanso(true));
+  document.getElementById("btn-sumar-15").addEventListener("click", () => ajustarDescanso(15));
+  document.getElementById("btn-restar-15").addEventListener("click", () => ajustarDescanso(-15));
+  document.getElementById("check-descanso-automatico").addEventListener("change", (evento) => {
+    localStorage.setItem("descansoAutomatico", String(evento.target.checked));
+  });
+  document.getElementById("selector-dia-prueba").addEventListener("change", renderizarPantallaHoy);
   document.getElementById("btn-salir-entrenamiento").addEventListener("click", () => {
     if (confirm("¿Seguro que quieres salir? El progreso de esta sesión aún no se guarda (eso llega en la Parte C).")) {
       salirEntrenamiento();
