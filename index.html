@@ -145,6 +145,15 @@
       <div id="barras-macros"></div>
     </section>
 
+    <section class="card resumen-semanal-card">
+      <div class="titulo-con-accion">
+        <h2>Resumen semanal</h2>
+        <span class="rango-semana" id="rango-semana-nutricion"></span>
+      </div>
+      <div class="resumen-semanal-grid" id="resumen-semanal-grid"></div>
+      <div class="dias-semana-nutricion" id="dias-semana-nutricion"></div>
+    </section>
+
     <section class="card" id="form-objetivos" hidden>
       <h2>Configurar objetivos</h2>
       <div class="grid-campos">
@@ -184,6 +193,14 @@
       </div>
     </section>
 
+    <section class="card">
+      <div class="titulo-con-accion">
+        <h2>Alimentos frecuentes</h2>
+        <span class="nota">Un toque para añadir</span>
+      </div>
+      <div id="lista-alimentos-frecuentes"></div>
+    </section>
+
     <button class="btn-primario btn-grande" id="btn-mostrar-form-comida">+ Registrar comida</button>
 
     <section class="card" id="form-comida" hidden>
@@ -202,6 +219,7 @@
         <label>Hora<input type="time" id="comida-hora" /></label>
       </div>
       <label class="observaciones-label">Comentario<textarea id="comida-comentario" placeholder="Preparación, hambre, observación..."></textarea></label>
+      <label class="check-frecuente"><input type="checkbox" id="guardar-como-frecuente" /> Guardar también como alimento frecuente</label>
       <button class="btn-primario" id="btn-guardar-comida">Guardar comida</button>
       <button class="btn-secundario btn-ancho" id="btn-cancelar-comida">Cancelar</button>
     </section>

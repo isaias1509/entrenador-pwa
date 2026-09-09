@@ -1,4 +1,4 @@
-const CACHE_NAME = "mi-gym-app-v8";
+const CACHE_NAME = "mi-gym-app-v9";
 const ARCHIVOS_CACHE = [
   "./",
   "./index.html",

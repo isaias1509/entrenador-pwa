@@ -489,3 +489,26 @@ body {
   .grid-campos { grid-template-columns: 1fr; }
   .nutricion-header { align-items: flex-start; flex-direction: column; }
 }
+
+.rango-semana { color: #8a8a92; font-size: 0.72rem; text-align: right; }
+.resumen-semanal-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px; }
+.resumen-semanal-dato { background: #1c1c24; border-radius: 10px; padding: 11px; text-align: center; }
+.resumen-semanal-dato strong { display: block; color: #a68cff; font-size: 1.1rem; }
+.resumen-semanal-dato span { color: #8a8a92; font-size: 0.7rem; }
+.dias-semana-nutricion { margin-top: 12px; border-top: 1px solid #292932; padding-top: 8px; }
+.dia-nutricion-fila { display: grid; grid-template-columns: 44px 1fr auto; gap: 8px; align-items: center; padding: 7px 0; font-size: 0.76rem; }
+.dia-nutricion-fila + .dia-nutricion-fila { border-top: 1px solid #22222a; }
+.dia-nutricion-fila .dia-nombre { color: #bfc0c8; font-weight: 650; }
+.dia-nutricion-fila .dia-macros { color: #85858f; }
+.dia-cumplimiento { color: #4ade80; }
+.dia-sin-registro { color: #555560; }
+
+.frecuente-vacio { color: #71717b; font-size: 0.82rem; margin-top: 10px; }
+.frecuente-item { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 11px 0; border-bottom: 1px solid #292932; }
+.frecuente-item:last-child { border-bottom: none; }
+.frecuente-item h3 { font-size: 0.9rem; }
+.frecuente-item p { color: #85858f !important; font-size: 0.74rem; margin: 3px 0 0 !important; }
+.frecuente-acciones { display: flex; gap: 5px; }
+.btn-frecuente-add { color: #86efac; }
+.check-frecuente { display: flex; align-items: center; gap: 8px; color: #bfc0c8; font-size: 0.82rem; margin-top: 12px; }
+.check-frecuente input { width: 18px; height: 18px; accent-color: #a68cff; }

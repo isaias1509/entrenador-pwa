@@ -1381,6 +1381,113 @@ function renderizarNutricion() {
     ? `✓ Creatina tomada (${redondear(datos.creatinaG)} g${datos.creatinaHora ? ` · ${datos.creatinaHora}` : ""})`
     : `Marcar ${objetivos.creatinaG} g tomados`;
   renderizarListaComidas(datos.comidas);
+  renderizarAlimentosFrecuentes();
+  renderizarResumenSemanal();
+}
+
+function inicioYFinDeSemana(fechaStr) {
+  const fecha = new Date(`${fechaStr}T12:00:00`);
+  const diferenciaLunes = (fecha.getDay() + 6) % 7;
+  const inicio = new Date(fecha);
+  inicio.setDate(fecha.getDate() - diferenciaLunes);
+  const fin = new Date(inicio);
+  fin.setDate(inicio.getDate() + 6);
+  return { inicio, fin };
+}
+
+function renderizarResumenSemanal() {
+  const objetivos = obtenerObjetivosNutricion();
+  const todos = obtenerTodosLosDiasNutricion();
+  const { inicio, fin } = inicioYFinDeSemana(fechaNutricionActual());
+  const dias = [];
+  for (let i = 0; i < 7; i++) {
+    const fecha = new Date(inicio);
+    fecha.setDate(inicio.getDate() + i);
+    const clave = claveFechaLocal(fecha);
+    const datos = todos[clave] || { comidas: [], aguaMl: 0, creatinaG: 0 };
+    const totales = calcularTotalesNutricion(datos);
+    const registrado = datos.comidas.length > 0 || datos.aguaMl > 0 || datos.creatinaG > 0;
+    dias.push({ fecha, clave, datos, totales, registrado });
+  }
+  const registrados = dias.filter((dia) => dia.registrado);
+  const divisor = registrados.length || 1;
+  const promedio = (campo) => registrados.reduce((total, dia) => total + (dia.totales[campo] || 0), 0) / divisor;
+  const promedioAgua = registrados.reduce((total, dia) => total + (dia.datos.aguaMl || 0), 0) / divisor;
+  const diasCalorias = registrados.filter((dia) => dia.totales.kcal >= objetivos.kcal * 0.9 && dia.totales.kcal <= objetivos.kcal * 1.1).length;
+  const diasProteina = registrados.filter((dia) => dia.totales.proteina >= objetivos.proteina).length;
+  const diasAgua = registrados.filter((dia) => dia.datos.aguaMl >= objetivos.aguaMl).length;
+  const diasCreatina = registrados.filter((dia) => dia.datos.creatinaG >= objetivos.creatinaG).length;
+
+  const formatoCorto = { day: "numeric", month: "short" };
+  document.getElementById("rango-semana-nutricion").textContent = `${inicio.toLocaleDateString("es-PE", formatoCorto)} – ${fin.toLocaleDateString("es-PE", formatoCorto)}`;
+  document.getElementById("resumen-semanal-grid").innerHTML = `
+    <div class="resumen-semanal-dato"><strong>${registrados.length}/7</strong><span>Días registrados</span></div>
+    <div class="resumen-semanal-dato"><strong>${redondear(promedio("kcal"))}</strong><span>Promedio kcal</span></div>
+    <div class="resumen-semanal-dato"><strong>${redondear(promedio("proteina"))} g</strong><span>Promedio proteína</span></div>
+    <div class="resumen-semanal-dato"><strong>${redondear(promedioAgua)} ml</strong><span>Promedio agua</span></div>
+    <div class="resumen-semanal-dato"><strong>${diasCalorias}/${registrados.length || 0}</strong><span>Meta de calorías</span></div>
+    <div class="resumen-semanal-dato"><strong>${diasProteina}/${registrados.length || 0}</strong><span>Meta de proteína</span></div>
+    <div class="resumen-semanal-dato"><strong>${diasAgua}/${registrados.length || 0}</strong><span>Meta de agua</span></div>
+    <div class="resumen-semanal-dato"><strong>${diasCreatina}/${registrados.length || 0}</strong><span>Creatina cumplida</span></div>`;
+
+  document.getElementById("dias-semana-nutricion").innerHTML = dias.map((dia) => {
+    const nombre = dia.fecha.toLocaleDateString("es-PE", { weekday: "short" }).replace(".", "");
+    if (!dia.registrado) return `<div class="dia-nutricion-fila"><span class="dia-nombre">${nombre}</span><span class="dia-sin-registro">Sin registro</span><span></span></div>`;
+    const cumple = dia.totales.proteina >= objetivos.proteina && dia.datos.creatinaG >= objetivos.creatinaG;
+    return `<div class="dia-nutricion-fila"><span class="dia-nombre">${nombre}</span><span class="dia-macros">${redondear(dia.totales.kcal)} kcal · P ${redondear(dia.totales.proteina)} g</span><span class="${cumple ? "dia-cumplimiento" : "dia-sin-registro"}">${cumple ? "✓" : "—"}</span></div>`;
+  }).join("");
+}
+
+function obtenerAlimentosFrecuentes() {
+  try {
+    return JSON.parse(localStorage.getItem("alimentosFrecuentes")) || [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function guardarAlimentosFrecuentes(alimentos) {
+  localStorage.setItem("alimentosFrecuentes", JSON.stringify(alimentos));
+}
+
+function guardarComoFrecuente(comida) {
+  const frecuentes = obtenerAlimentosFrecuentes();
+  const plantilla = { ...comida, id: generarId(), hora: "", comentario: "" };
+  const indiceExistente = frecuentes.findIndex((item) => item.nombre.toLowerCase() === comida.nombre.toLowerCase() && item.cantidad === comida.cantidad && item.unidad === comida.unidad);
+  if (indiceExistente >= 0) frecuentes[indiceExistente] = plantilla;
+  else frecuentes.push(plantilla);
+  guardarAlimentosFrecuentes(frecuentes);
+}
+
+function renderizarAlimentosFrecuentes() {
+  const contenedor = document.getElementById("lista-alimentos-frecuentes");
+  const frecuentes = obtenerAlimentosFrecuentes();
+  if (!frecuentes.length) {
+    contenedor.innerHTML = '<p class="frecuente-vacio">Marca “guardar como frecuente” cuando registres una comida.</p>';
+    return;
+  }
+  contenedor.innerHTML = frecuentes.map((item, indice) => `<div class="frecuente-item">
+    <div><h3>${escaparHTML(item.nombre)}</h3><p>${redondear(item.cantidad)} ${escaparHTML(item.unidad)} · ${redondear(item.kcal)} kcal · P ${redondear(item.proteina)} g</p></div>
+    <div class="frecuente-acciones"><button class="btn-serie-accion btn-frecuente-add" data-usar-frecuente="${indice}">+ Añadir</button><button class="btn-serie-accion btn-serie-eliminar" data-eliminar-frecuente="${indice}">×</button></div>
+  </div>`).join("");
+}
+
+function usarAlimentoFrecuente(indice) {
+  const plantilla = obtenerAlimentosFrecuentes()[indice];
+  if (!plantilla) return;
+  const datos = obtenerNutricionDelDia();
+  datos.comidas.push({ ...plantilla, id: generarId(), hora: horaActual() });
+  guardarNutricionDelDia(datos);
+  renderizarNutricion();
+}
+
+function eliminarAlimentoFrecuente(indice) {
+  const frecuentes = obtenerAlimentosFrecuentes();
+  const alimento = frecuentes[indice];
+  if (!alimento || !confirm(`¿Quitar “${alimento.nombre}” de tus alimentos frecuentes?`)) return;
+  frecuentes.splice(indice, 1);
+  guardarAlimentosFrecuentes(frecuentes);
+  renderizarAlimentosFrecuentes();
 }
 
 function crearBarraMacro(nombre, actual, meta, unidad) {
@@ -1452,6 +1559,7 @@ function limpiarFormularioComida() {
   ["comida-nombre", "comida-cantidad", "comida-kcal", "comida-proteina", "comida-carbohidratos", "comida-grasas", "comida-comentario"].forEach((id) => document.getElementById(id).value = "");
   document.getElementById("comida-unidad").value = "gramos";
   document.getElementById("comida-hora").value = horaActual();
+  document.getElementById("guardar-como-frecuente").checked = false;
 }
 
 function cargarComidaEnFormulario(comida) {
@@ -1492,6 +1600,7 @@ function guardarComida() {
   const datos = obtenerNutricionDelDia();
   if (indiceComidaEditando === null) datos.comidas.push(comida);
   else datos.comidas[indiceComidaEditando] = comida;
+  if (document.getElementById("guardar-como-frecuente").checked) guardarComoFrecuente(comida);
   guardarNutricionDelDia(datos);
   cerrarFormularioComida();
   renderizarNutricion();
@@ -1675,6 +1784,12 @@ function inicializarEventosEntrenamiento() {
     const eliminar = evento.target.closest("[data-eliminar-comida]");
     if (editar) mostrarFormularioComida(Number(editar.dataset.editarComida));
     if (eliminar) eliminarComida(Number(eliminar.dataset.eliminarComida));
+  });
+  document.getElementById("lista-alimentos-frecuentes").addEventListener("click", (evento) => {
+    const usar = evento.target.closest("[data-usar-frecuente]");
+    const eliminar = evento.target.closest("[data-eliminar-frecuente]");
+    if (usar) usarAlimentoFrecuente(Number(usar.dataset.usarFrecuente));
+    if (eliminar) eliminarAlimentoFrecuente(Number(eliminar.dataset.eliminarFrecuente));
   });
   document.getElementById("btn-editar-objetivos").addEventListener("click", abrirFormularioObjetivos);
   document.getElementById("btn-guardar-objetivos").addEventListener("click", guardarObjetivosNutricion);
