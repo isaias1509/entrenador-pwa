@@ -1,4 +1,5 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, button, a, input, select, textarea { touch-action: manipulation; }
 
 body {
   background: #0a0a0e;
@@ -488,6 +489,43 @@ body {
 @media (max-width: 380px) {
   .grid-campos { grid-template-columns: 1fr; }
   .nutricion-header { align-items: flex-start; flex-direction: column; }
+}
+
+/* Etapa 4: copias, informe y ajustes */
+.herramientas-card { margin-bottom: 25px; }
+.herramientas-card h2 { font-size: 1.05rem; }
+.btn-archivo { display: block; text-align: center; font-size: .9rem; }
+.btn-archivo input { display: none; }
+.btn-informe { width: auto; margin: 0; padding: 9px 13px; }
+.campo-ancho { grid-column: 1 / -1; }
+
+.informe-mensual { margin-top: 18px; }
+.portada-informe { background: linear-gradient(145deg, #172840, #261d3b); border-radius: 16px; padding: 22px; }
+.portada-informe p { color: #60a5fa; font-weight: 800; letter-spacing: .12em; font-size: .72rem; }
+.portada-informe h1 { font-size: 1.55rem; text-transform: capitalize; margin: 6px 0; }
+.portada-informe span { color: #9ca3af; font-size: .75rem; }
+.informe-bloque { background: #16161d; border-radius: 16px; padding: 18px; margin-top: 14px; }
+.informe-bloque h2 { font-size: 1.05rem; margin-bottom: 12px; }
+.informe-bloque > p { color: #9ca3af; font-size: .8rem; margin-bottom: 10px; }
+.resumen-informe { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.resumen-informe div { background: #1c1c24; border-radius: 10px; padding: 11px; }
+.resumen-informe strong { display: block; color: #a68cff; font-size: 1.05rem; }
+.resumen-informe span { color: #85858f; font-size: .68rem; }
+.informe-bloque table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: .72rem; }
+.informe-bloque th, .informe-bloque td { text-align: left; border-bottom: 1px solid #30303a; padding: 8px 4px; }
+.informe-bloque th { color: #9ca3af; }
+
+@media print {
+  @page { size: A4; margin: 12mm; }
+  body { background: #fff; color: #111; padding: 0; }
+  .bottom-nav, .no-imprimir { display: none !important; }
+  #pantalla-informe { display: block !important; padding: 0; }
+  .portada-informe { background: #eef2ff !important; color: #111; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .informe-bloque { background: #fff; color: #111; border: 1px solid #ddd; break-inside: avoid; }
+  .resumen-informe div { background: #f5f5f7 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .resumen-informe strong, .portada-informe p { color: #5138a5; }
+  .resumen-informe span, .informe-bloque > p, .portada-informe span, .informe-bloque th { color: #555; }
+  .informe-bloque th, .informe-bloque td { border-color: #ddd; }
 }
 
 .rango-semana { color: #8a8a92; font-size: 0.72rem; text-align: right; }

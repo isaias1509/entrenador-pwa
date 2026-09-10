@@ -240,6 +240,17 @@ let segundosRestantes = 0;
 let descansoPausado = false;
 let audioContexto = null;
 
+const RUTINAS_ORIGINALES = JSON.parse(JSON.stringify(RUTINAS));
+function aplicarRutinasGuardadas() {
+  try {
+    const guardadas = JSON.parse(localStorage.getItem("rutinasPersonalizadas"));
+    if (guardadas) Object.keys(guardadas).forEach((dia) => { RUTINAS[dia] = guardadas[dia]; });
+  } catch (error) {
+    console.error("No se pudieron cargar las rutinas personalizadas:", error);
+  }
+}
+aplicarRutinasGuardadas();
+
 function iniciarEntrenamiento(rutina) {
   detenerDescanso(false);
   indiceEdicionSerie = null;
@@ -1931,6 +1942,206 @@ function mostrarProgreso() {
   renderizarProgreso();
 }
 
+// ============================================================
+// ETAPA 4: COPIAS, INFORMES Y AJUSTES
+// ============================================================
+
+function descargarArchivo(contenido, nombre, tipo) {
+  const url = URL.createObjectURL(new Blob([contenido], { type: tipo }));
+  const enlace = document.createElement("a");
+  enlace.href = url;
+  enlace.download = nombre;
+  document.body.appendChild(enlace);
+  enlace.click();
+  enlace.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function blobADataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const lector = new FileReader();
+    lector.onload = () => resolve(lector.result);
+    lector.onerror = () => reject(lector.error);
+    lector.readAsDataURL(blob);
+  });
+}
+
+function dataURLABlob(dataURL) {
+  const [cabecera, base64] = dataURL.split(",");
+  const tipo = cabecera.match(/data:(.*?);base64/)?.[1] || "image/jpeg";
+  const binario = atob(base64);
+  const bytes = new Uint8Array(binario.length);
+  for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+  return new Blob([bytes], { type: tipo });
+}
+
+async function exportarCopiaSeguridad() {
+  const boton = document.getElementById("btn-exportar-copia");
+  boton.disabled = true; boton.textContent = "Preparando copia…";
+  try {
+    const almacenamiento = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const clave = localStorage.key(i);
+      almacenamiento[clave] = localStorage.getItem(clave);
+    }
+    const fotos = await consultarFotos();
+    const fotosExportadas = [];
+    for (const registro of fotos) {
+      const salida = { fecha: registro.fecha, nota: registro.nota || "", fotos: {} };
+      for (const [lado, blob] of Object.entries(registro.fotos || {})) salida.fotos[lado] = await blobADataURL(blob);
+      fotosExportadas.push(salida);
+    }
+    const copia = { app: "Mi Gym App", version: 1, creada: new Date().toISOString(), localStorage: almacenamiento, fotos: fotosExportadas };
+    descargarArchivo(JSON.stringify(copia), `mi-gym-copia-${claveFechaLocal()}.json`, "application/json");
+    alert("Copia creada. Guárdala en Archivos o iCloud para no perderla.");
+  } catch (error) {
+    console.error(error); alert("No se pudo crear la copia de seguridad.");
+  } finally {
+    boton.disabled = false; boton.textContent = "Exportar copia de seguridad";
+  }
+}
+
+async function restaurarCopiaSeguridad(archivo) {
+  if (!archivo) return;
+  try {
+    const copia = JSON.parse(await archivo.text());
+    if (copia.app !== "Mi Gym App" || !copia.localStorage || !Array.isArray(copia.fotos)) throw new Error("Formato inválido");
+    if (!confirm("Esto reemplazará los datos actuales por los de la copia. ¿Continuar?")) return;
+    localStorage.clear();
+    Object.entries(copia.localStorage).forEach(([clave, valor]) => localStorage.setItem(clave, valor));
+    const db = await abrirBaseFotos();
+    await new Promise((resolve, reject) => {
+      const transaccion = db.transaction("fotos", "readwrite");
+      const almacen = transaccion.objectStore("fotos");
+      almacen.clear();
+      copia.fotos.forEach((registro) => almacen.put({ ...registro, fotos: Object.fromEntries(Object.entries(registro.fotos || {}).map(([lado, data]) => [lado, dataURLABlob(data)])) }));
+      transaccion.oncomplete = resolve;
+      transaccion.onerror = () => reject(transaccion.error);
+    });
+    db.close();
+    alert("Copia restaurada correctamente. La app se recargará.");
+    location.reload();
+  } catch (error) {
+    console.error(error); alert("Ese archivo no es una copia válida de Mi Gym App.");
+  } finally {
+    document.getElementById("input-restaurar-copia").value = "";
+  }
+}
+
+function mesActual() {
+  return claveFechaLocal().slice(0, 7);
+}
+
+function abrirInforme() {
+  document.querySelectorAll("main.app").forEach((pantalla) => pantalla.hidden = true);
+  document.getElementById("pantalla-informe").hidden = false;
+  document.getElementById("mes-informe").value ||= mesActual();
+  renderizarInformeMensual();
+}
+
+function renderizarInformeMensual() {
+  const mes = document.getElementById("mes-informe").value || mesActual();
+  const entrenamientos = obtenerHistorial().filter((item) => String(item.fecha || item.inicio).startsWith(mes));
+  const resumenes = entrenamientos.map(calcularResumen);
+  const minutos = entrenamientos.reduce((total, item) => total + duracionSesion(item), 0);
+  const series = resumenes.reduce((total, item) => total + item.series, 0);
+  const volumen = resumenes.reduce((total, item) => total + item.volumen, 0);
+  const nutricion = obtenerTodosLosDiasNutricion();
+  const diasNutricion = Object.entries(nutricion).filter(([fecha, datos]) => fecha.startsWith(mes) && (datos.comidas?.length || datos.aguaMl || datos.creatinaG));
+  const totalesNutricion = diasNutricion.map(([, datos]) => ({ ...calcularTotalesNutricion(datos), agua: Number(datos.aguaMl) || 0, creatina: Number(datos.creatinaG) || 0 }));
+  const promedio = (campo) => diasNutricion.length ? redondear(totalesNutricion.reduce((total, item) => total + item[campo], 0) / diasNutricion.length) : 0;
+  const progreso = obtenerProgresoCorporal();
+  const pesos = progreso.pesos.filter((item) => item.fecha.startsWith(mes)).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const medidas = progreso.medidas.filter((item) => item.fecha.startsWith(mes)).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const cambioPeso = pesos.length > 1 ? redondear(pesos.at(-1).peso - pesos[0].peso) : null;
+  const nombreMes = new Date(`${mes}-02T12:00:00`).toLocaleDateString("es-PE", { month: "long", year: "numeric" });
+  const objetivos = obtenerObjetivosNutricion();
+  document.getElementById("contenido-informe").innerHTML = `
+    <header class="portada-informe"><p>MI GYM APP</p><h1>Informe de ${nombreMes}</h1><span>Generado el ${new Date().toLocaleDateString("es-PE")}</span></header>
+    <section class="informe-bloque"><h2>Entrenamiento</h2><div class="resumen-informe">
+      <div><strong>${entrenamientos.length}</strong><span>Sesiones</span></div><div><strong>${minutos}</strong><span>Minutos</span></div><div><strong>${series}</strong><span>Series</span></div><div><strong>${redondear(volumen).toLocaleString("es-PE")}</strong><span>kg de volumen</span></div>
+    </div>${entrenamientos.length ? `<table><thead><tr><th>Fecha</th><th>Rutina</th><th>Duración</th></tr></thead><tbody>${entrenamientos.map((item) => `<tr><td>${fechaLegibleCorta(item.fecha)}</td><td>${escaparHTML(item.rutina.nombre)}</td><td>${duracionSesion(item)} min</td></tr>`).join("")}</tbody></table>` : '<p>Sin entrenamientos registrados.</p>'}</section>
+    <section class="informe-bloque"><h2>Nutrición</h2><p>${diasNutricion.length} días registrados.</p><div class="resumen-informe">
+      <div><strong>${promedio("kcal")}</strong><span>kcal promedio</span></div><div><strong>${promedio("proteina")} g</strong><span>Proteína / ${objetivos.proteina} g</span></div><div><strong>${promedio("agua")} ml</strong><span>Agua / ${objetivos.aguaMl} ml</span></div><div><strong>${promedio("creatina")} g</strong><span>Creatina promedio</span></div>
+    </div></section>
+    <section class="informe-bloque"><h2>Progreso corporal</h2><div class="resumen-informe">
+      <div><strong>${pesos.length ? `${redondear(pesos.at(-1).peso)} kg` : "—"}</strong><span>Último peso</span></div><div><strong>${cambioPeso === null ? "—" : `${cambioPeso > 0 ? "+" : ""}${cambioPeso} kg`}</strong><span>Cambio del mes</span></div><div><strong>${medidas.at(-1)?.cintura ? `${medidas.at(-1).cintura} cm` : "—"}</strong><span>Cintura</span></div><div><strong>${medidas.at(-1)?.abdomen ? `${medidas.at(-1).abdomen} cm` : "—"}</strong><span>Abdomen</span></div>
+    </div></section>`;
+}
+
+function abrirAjustes() {
+  document.querySelectorAll("main.app").forEach((pantalla) => pantalla.hidden = true);
+  document.getElementById("pantalla-ajustes").hidden = false;
+  document.getElementById("ajuste-fecha-inicio").value = localStorage.getItem("fechaInicioPrograma") || "";
+  document.getElementById("ajuste-unidad-velocidad").value = localStorage.getItem("unidadVelocidad") || "km/h";
+  document.getElementById("ajuste-descanso-auto").checked = localStorage.getItem("descansoAutomatico") !== "false";
+  cargarDiasEditorRutina();
+}
+
+function guardarAjustes() {
+  const fecha = document.getElementById("ajuste-fecha-inicio").value;
+  if (!fecha) return alert("Selecciona la fecha de inicio del programa.");
+  localStorage.setItem("fechaInicioPrograma", fecha);
+  localStorage.setItem("unidadVelocidad", document.getElementById("ajuste-unidad-velocidad").value);
+  localStorage.setItem("descansoAutomatico", String(document.getElementById("ajuste-descanso-auto").checked));
+  document.getElementById("check-descanso-automatico").checked = document.getElementById("ajuste-descanso-auto").checked;
+  alert("Ajustes guardados.");
+}
+
+function cargarDiasEditorRutina() {
+  const select = document.getElementById("editor-dia-rutina");
+  select.innerHTML = Object.entries(RUTINAS).filter(([, rutina]) => rutina.tipo === "pesas").map(([dia, rutina]) => `<option value="${dia}">${escaparHTML(rutina.nombre)}</option>`).join("");
+  cargarEjerciciosEditorRutina();
+}
+
+function cargarEjerciciosEditorRutina() {
+  const dia = document.getElementById("editor-dia-rutina").value;
+  const ejercicios = RUTINAS[dia]?.ejercicios || [];
+  document.getElementById("editor-ejercicio-rutina").innerHTML = ejercicios.map((ejercicio, indice) => `<option value="${indice}">${escaparHTML(ejercicio.nombre)}</option>`).join("");
+  cargarValoresEditorRutina();
+}
+
+function cargarValoresEditorRutina() {
+  const dia = document.getElementById("editor-dia-rutina").value;
+  const indice = Number(document.getElementById("editor-ejercicio-rutina").value);
+  const ejercicio = RUTINAS[dia]?.ejercicios?.[indice];
+  if (!ejercicio) return;
+  const esTiempo = ejercicio.tipoSerie === "tiempo";
+  document.getElementById("editor-nombre-ejercicio").value = ejercicio.nombre;
+  document.getElementById("editor-series").value = ejercicio.series || "";
+  document.getElementById("editor-etiqueta-min").textContent = esTiempo ? "Segundos mínimos" : "Reps mínimas";
+  document.getElementById("editor-etiqueta-max").textContent = esTiempo ? "Segundos máximos" : "Reps máximas";
+  document.getElementById("editor-reps-min").value = esTiempo ? ejercicio.segMin : ejercicio.repsMin;
+  document.getElementById("editor-reps-max").value = esTiempo ? ejercicio.segMax : ejercicio.repsMax;
+  document.getElementById("editor-descanso").value = ejercicio.descansoSeg || 0;
+}
+
+function guardarEjercicioEditado() {
+  const dia = document.getElementById("editor-dia-rutina").value;
+  const indice = Number(document.getElementById("editor-ejercicio-rutina").value);
+  const ejercicio = RUTINAS[dia]?.ejercicios?.[indice];
+  if (!ejercicio) return;
+  const nombre = document.getElementById("editor-nombre-ejercicio").value.trim();
+  const series = Number(document.getElementById("editor-series").value);
+  const repsMin = Number(document.getElementById("editor-reps-min").value);
+  const repsMax = Number(document.getElementById("editor-reps-max").value);
+  const descansoSeg = Number(document.getElementById("editor-descanso").value);
+  if (!nombre || series < 1 || repsMin < 1 || repsMax < repsMin || descansoSeg < 0) return alert("Revisa nombre, series, repeticiones y descanso.");
+  if (ejercicio.tipoSerie === "tiempo") Object.assign(ejercicio, { nombre, series, segMin: repsMin, segMax: repsMax, descansoSeg });
+  else Object.assign(ejercicio, { nombre, series, repsMin, repsMax, descansoSeg });
+  localStorage.setItem("rutinasPersonalizadas", JSON.stringify(RUTINAS));
+  cargarEjerciciosEditorRutina();
+  alert("Ejercicio actualizado.");
+}
+
+function restaurarRutinasOriginales() {
+  if (!confirm("¿Restaurar todas las rutinas originales? Tus entrenamientos guardados no se borrarán.")) return;
+  Object.keys(RUTINAS_ORIGINALES).forEach((dia) => { RUTINAS[dia] = JSON.parse(JSON.stringify(RUTINAS_ORIGINALES[dia])); });
+  localStorage.removeItem("rutinasPersonalizadas");
+  cargarDiasEditorRutina();
+  alert("Rutinas originales restauradas.");
+}
+
 function mostrarHoy() {
   if (temporizadorBoxeo) pausarOReanudarBoxeo();
   document.querySelectorAll("main.app").forEach((pantalla) => pantalla.hidden = true);
@@ -2054,6 +2265,19 @@ function inicializarEventosEntrenamiento() {
     const eliminar = evento.target.closest("[data-eliminar-fotos]");
     if (eliminar) eliminarFotosProgreso(eliminar.dataset.eliminarFotos);
   });
+  document.getElementById("btn-exportar-copia").addEventListener("click", exportarCopiaSeguridad);
+  document.getElementById("input-restaurar-copia").addEventListener("change", (evento) => restaurarCopiaSeguridad(evento.target.files[0]));
+  document.getElementById("btn-abrir-informe").addEventListener("click", abrirInforme);
+  document.getElementById("btn-cerrar-informe").addEventListener("click", abrirHistorial);
+  document.getElementById("mes-informe").addEventListener("change", renderizarInformeMensual);
+  document.getElementById("btn-generar-pdf").addEventListener("click", () => window.print());
+  document.getElementById("btn-abrir-ajustes").addEventListener("click", abrirAjustes);
+  document.getElementById("btn-cerrar-ajustes").addEventListener("click", abrirHistorial);
+  document.getElementById("btn-guardar-ajustes").addEventListener("click", guardarAjustes);
+  document.getElementById("editor-dia-rutina").addEventListener("change", cargarEjerciciosEditorRutina);
+  document.getElementById("editor-ejercicio-rutina").addEventListener("change", cargarValoresEditorRutina);
+  document.getElementById("btn-guardar-ejercicio").addEventListener("click", guardarEjercicioEditado);
+  document.getElementById("btn-restaurar-rutinas").addEventListener("click", restaurarRutinasOriginales);
   document.getElementById("fecha-nutricion").addEventListener("change", () => {
     cerrarFormularioComida();
     renderizarNutricion();

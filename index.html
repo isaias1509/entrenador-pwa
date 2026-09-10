@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>Mi Gym App</title>
 
   <link rel="manifest" href="manifest.json" />
@@ -393,6 +393,57 @@
     </section>
     <p class="contador-historial" id="contador-historial"></p>
     <section id="lista-historial"></section>
+    <section class="card herramientas-card">
+      <h2>Herramientas y ajustes</h2>
+      <p class="nota">Protege tus datos y personaliza la app.</p>
+      <button class="btn-secundario btn-ancho" id="btn-abrir-informe">Informe mensual</button>
+      <button class="btn-secundario btn-ancho" id="btn-exportar-copia">Exportar copia de seguridad</button>
+      <label class="btn-secundario btn-ancho btn-archivo">Restaurar copia<input type="file" id="input-restaurar-copia" accept="application/json,.json" /></label>
+      <button class="btn-secundario btn-ancho" id="btn-abrir-ajustes">Ajustes y rutinas</button>
+    </section>
+  </main>
+
+  <main class="app" id="pantalla-informe" hidden>
+    <header class="app-header header-entrenamiento no-imprimir">
+      <button class="btn-texto" id="btn-cerrar-informe">← Historial</button>
+      <h1>Informe mensual</h1>
+    </header>
+    <section class="filtros-historial no-imprimir">
+      <label>Mes<input type="month" id="mes-informe" /></label>
+      <button class="btn-primario btn-informe" id="btn-generar-pdf">Guardar como PDF</button>
+    </section>
+    <section id="contenido-informe" class="informe-mensual"></section>
+  </main>
+
+  <main class="app" id="pantalla-ajustes" hidden>
+    <header class="app-header header-entrenamiento">
+      <button class="btn-texto" id="btn-cerrar-ajustes">← Historial</button>
+      <h1>Ajustes</h1>
+    </header>
+    <section class="card">
+      <h2>Configuración general</h2>
+      <div class="grid-campos">
+        <label>Inicio del programa<input type="date" id="ajuste-fecha-inicio" /></label>
+        <label>Velocidad<select id="ajuste-unidad-velocidad"><option value="km/h">km/h</option><option value="mph">mph</option></select></label>
+      </div>
+      <label class="check-frecuente"><input type="checkbox" id="ajuste-descanso-auto" /> Iniciar descanso automáticamente</label>
+      <button class="btn-primario" id="btn-guardar-ajustes">Guardar ajustes</button>
+    </section>
+    <section class="card">
+      <h2>Editar rutina de pesas</h2>
+      <p class="nota">Elige un día y un ejercicio. Los cambios quedan solo en tu teléfono.</p>
+      <div class="grid-campos">
+        <label>Día<select id="editor-dia-rutina"></select></label>
+        <label>Ejercicio<select id="editor-ejercicio-rutina"></select></label>
+        <label class="campo-ancho">Nombre<input type="text" id="editor-nombre-ejercicio" /></label>
+        <label>Series<input type="number" id="editor-series" min="1" max="20" /></label>
+        <label><span id="editor-etiqueta-min">Reps mínimas</span><input type="number" id="editor-reps-min" min="1" /></label>
+        <label><span id="editor-etiqueta-max">Reps máximas</span><input type="number" id="editor-reps-max" min="1" /></label>
+        <label>Descanso (seg)<input type="number" id="editor-descanso" min="0" step="15" /></label>
+      </div>
+      <button class="btn-primario" id="btn-guardar-ejercicio">Guardar ejercicio</button>
+      <button class="btn-peligro btn-ancho" id="btn-restaurar-rutinas">Restaurar rutinas originales</button>
+    </section>
   </main>
 
   <main class="app" id="pantalla-detalle-historial" hidden>
